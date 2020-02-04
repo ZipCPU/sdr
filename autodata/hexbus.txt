@@ -102,7 +102,7 @@
 		m_core->i_host_uart_rx = (*m_dbgbus)(m_core->o_host_uart_tx);
 @RTL.MAKE.GROUP=HEXBUS
 @RTL.MAKE.SUBD=hexbus
-@RTL.MAKE.FILES= hbbus.v hbconsole.v hbdechex.v hbdeword.v
+@RTL.MAKE.FILES= hbbus.v hbdechex.v hbdeword.v
 	hbexec.v hbgenhex.v hbidle.v hbints.v hbnewline.v hbpack.v
 @PREFIX=wbuart
 @RTL.MAKE.GROUP=WBUART
