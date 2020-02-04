@@ -1,0 +1,4 @@
+main_tb
+obj-pc/
+*.hex
+tags

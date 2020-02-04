@@ -1,0 +1,44 @@
+# set_io i_clk_12mhz	35
+#
+set_io o_ledr		11
+set_io o_ledg		37
+#
+set_io i_btn[0]	10	## BUTTONn
+set_io i_btn[1]	20	## P2_9
+set_io i_btn[2]	19	## P2_4
+set_io i_btn[3]	18	## P2_10
+#
+# FTDI
+set_io i_host_uart_rx	6
+set_io o_host_uart_tx	9
+# set_io o_host_uart_cts_n
+# set_io i_host_uart_rts_n
+#
+# PMod 1A bottom: MIC3
+set_io o_mic_csn	 3	# SS    7 P1A7   3 ### Top was ... 1 P1A1  4
+### NC - no connect
+set_io i_mic_miso	46	# MISO 10 P1A9  46 ### Top was ... 3 P1A3 47
+set_io o_mic_sck	44	# SCK   9 P1A10 44 ### Top was ... 4 P1A4 45
+#
+# PMod 1A bottom: AMP2 (5-6 are GND/VCC)
+set_io o_pwm_audio	 3	# 1 P1A7   3
+set_io o_pwm_gain	48	# 2 P1A8  48
+### NC - no connect
+set_io o_pwm_shutdown_n 44	# 4 P1A10 44
+#
+# Assuming sides ...
+# PMod 1B
+set_io o_rf_clk	32	# CLK_IN P1B9
+set_io o_rf_data[0]	38	# Q-In P1B2
+set_io o_rf_data[1]	43	# I-In P1B1
+#
+# set_io i_rf_clk	28	# CLK_OUT P1B10
+# set_io i_rf_data[0]	34	# Q-Out P1B3
+# set_io i_rf_data[1]	31	# I-Out P1B4
+#
+set_io io_i2c_scl	42	# I2C_CLK P1B7
+set_io io_i2c_sda	36	# I2C_SDA P1B8
+##
+
+## Adding in any PCF_INSERT tags
+

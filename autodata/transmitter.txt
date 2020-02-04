@@ -1,0 +1,77 @@
+################################################################################
+##
+## Filename: 	transmitter.txt
+##
+## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
+##
+## Purpose:	
+##
+## Creator:	Dan Gisselquist, Ph.D.
+##		Gisselquist Technology, LLC
+##
+################################################################################
+##
+## Copyright (C) 2020, Gisselquist Technology, LLC
+##
+## This program is free software (firmware): you can redistribute it and/or
+## modify it under the terms of the GNU General Public License as published
+## by the Free Software Foundation, either version 3 of the License, or (at
+## your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+## target there if the PDF file isn't present.)  If not, see
+## <http://www.gnu.org/licenses/> for a copy.
+##
+## License:	GPL, v3, as defined and found on www.gnu.org,
+##		http://www.gnu.org/licenses/gpl.html
+##
+##
+################################################################################
+##
+##
+@PREFIX=tx
+@DEVID=TRANSMITTER
+@DEPENDS=RFSCOPE_ACCESS
+@SLAVE.BUS=wb
+@SLAVE.TYPE=DOUBLE
+@NADDR=4
+@XMITTER=qamxmit
+@MAIN.PORTLIST=
+		// @$(DEVID) I/O ports
+		o_rf_data, o_mic_csn, o_mic_sck, i_mic_miso
+@MAIN.IODECL=
+	output	wire	[1:0]	o_rf_data;
+	output	wire		o_mic_csn, o_mic_sck;
+	input	wire		i_mic_miso;
+@MAIN.PARAMS=
+@MAIN.DEFNS=
+	wire		rfdbg_ce;
+	wire	[31:0]	rfdbg_data;
+	wire	[9:0]	rfdbg_hist;
+	wire	[1:0]	rfdbg_sel;
+@MAIN.INSERT=
+	//
+	// Transmit logic
+	//
+	@$(XMITTER)
+	@$(XMITTER)i(i_clk, i_reset, audio_en, rf_en,
+		@$(SLAVE.PORTLIST),
+		o_mic_csn, o_mic_sck, i_mic_miso,
+		o_rf_data,
+		rfdbg_sel, rfdbg_ce, rfdbg_data, rfdbg_hist);
+
+@SIM.CLOCK=clk
+@SIM.INCLUDE=
+#include "micnco.h"
+@SIM.DEFNS=
+	MICNCO	*m_mic;
+@SIM.INIT=
+	m_mic = new MICNCO();
+@SIM.TICK=
+	m_core->i_mic_miso= (*m_mic)(m_core->o_mic_sck, m_core->o_mic_csn);

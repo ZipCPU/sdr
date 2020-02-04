@@ -1,0 +1,125 @@
+################################################################################
+##
+## Filename: 	transmitter.txt
+##
+## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
+##
+## Purpose:	
+##
+## Creator:	Dan Gisselquist, Ph.D.
+##		Gisselquist Technology, LLC
+##
+################################################################################
+##
+## Copyright (C) 2020, Gisselquist Technology, LLC
+##
+## This program is free software (firmware): you can redistribute it and/or
+## modify it under the terms of the GNU General Public License as published
+## by the Free Software Foundation, either version 3 of the License, or (at
+## your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+## target there if the PDF file isn't present.)  If not, see
+## <http://www.gnu.org/licenses/> for a copy.
+##
+## License:	GPL, v3, as defined and found on www.gnu.org,
+##		http://www.gnu.org/licenses/gpl.html
+##
+##
+################################################################################
+##
+##
+@PREFIX=tx
+@DEPENDS=RFSCOPE_ACCESS
+@SLAVE.BUS=wb
+@SLAVE.TYPE=DOUBLE
+@NADDR=8
+@XMITTER=amxmit
+@RECEIVER=amdemod
+@MAIN.PORTLIST=
+		// Transmitter I/O ports
+		o_rf_data, o_mic_csn, o_mic_sck, i_mic_miso,
+		// Receiver I/O ports
+		o_pwm_audio, o_pwm_shutdown_n, o_pwm_gain
+@MAIN.IODECL=
+	output	wire	[1:0]	o_rf_data;
+	output	wire		o_mic_csn, o_mic_sck;
+	input	wire		i_mic_miso;
+	output	wire		o_pwm_audio, o_pwm_shutdown_n, o_pwm_gain;
+@MAIN.PARAMS=
+@MAIN.DEFNS=
+	wire	[1:0]	rfdbg_sel;
+	wire		rfdbg_ce,   txdbg_ce,   rxdbg_ce;
+	wire	[31:0]	rfdbg_data, txdbg_data, rxdbg_data;
+	wire	[9:0]	rfdbg_hist, txdbg_hist, rxdbg_hist;
+	//
+	wire		tx_@$(SLAVE.PREFIX)_stall, rx_@$(SLAVE.PREFIX)_stall;
+	wire		tx_@$(SLAVE.PREFIX)_ack,   rx_@$(SLAVE.PREFIX)_ack;
+	wire	[31:0]	tx_@$(SLAVE.PREFIX)_data,  rx_@$(SLAVE.PREFIX)_data;
+@MAIN.INSERT=
+`ifdef	VERILATOR
+	//
+	// Transmit logic
+	//
+	@$(XMITTER)
+	@$(XMITTER)i(i_clk, i_reset, audio_en, rf_en,
+		@$(SLAVE.PREFIX)_cyc, @$(SLAVE.PREFIX)_stb && !@$(SLAVE.PREFIX)_addr[2], @$(SLAVE.PREFIX)_we,
+			@$(SLAVE.PREFIX)_addr[1:0], @$(SLAVE.PREFIX)_data, @$(SLAVE.PREFIX)_sel,
+			tx_@$(SLAVE.PREFIX)_stall, tx_@$(SLAVE.PREFIX)_ack, tx_@$(SLAVE.PREFIX)_data,
+		o_mic_csn, o_mic_sck, i_mic_miso,
+		o_rf_data,
+		rfdbg_sel, txdbg_ce, txdbg_data, txdbg_hist);
+
+	//
+	// Receiver logic
+	//
+	@$(RECEIVER)
+	@$(RECEIVER)i(i_clk, i_reset, audio_en, rf_en,
+		@$(SLAVE.PREFIX)_cyc, @$(SLAVE.PREFIX)_stb && @$(SLAVE.PREFIX)_addr[2], @$(SLAVE.PREFIX)_we,
+			@$(SLAVE.PREFIX)_addr[1:0], @$(SLAVE.PREFIX)_data, @$(SLAVE.PREFIX)_sel,
+			rx_@$(SLAVE.PREFIX)_stall, rx_@$(SLAVE.PREFIX)_ack, rx_@$(SLAVE.PREFIX)_data,
+		o_rf_data, o_pwm_audio,
+		rfdbg_sel, rxdbg_ce, rxdbg_data, rxdbg_hist);
+`else
+	reg	r_tx_@$(SLAVE.PREFIX)_ack, r_rx_@$(SLAVE.PREFIX)_ack;
+
+	assign	tx_@$(SLAVE.PREFIX)_stall = 0;
+	assign	rx_@$(SLAVE.PREFIX)_stall = 0;
+	always @(posedge i_clk)
+		r_tx_@$(SLAVE.PREFIX)_ack <= @$(SLAVE.PREFIX)_stb && !@$(SLAVE.PREFIX)_addr[2];
+	always @(posedge i_clk)
+		r_rx_@$(SLAVE.PREFIX)_ack <= @$(SLAVE.PREFIX)_stb && @$(SLAVE.PREFIX)_addr[2];
+	assign	tx_@$(SLAVE.PREFIX)_ack = r_tx_@$(SLAVE.PREFIX)_ack;
+	assign	rx_@$(SLAVE.PREFIX)_ack = r_rx_@$(SLAVE.PREFIX)_ack;
+	assign tx_@$(SLAVE.PREFIX)_data = 0;
+	assign rx_@$(SLAVE.PREFIX)_data = 0;
+`endif
+
+	assign	o_pwm_shutdown_n = audio_en;
+	assign	o_pwm_gain = audio_en;
+	assign	@$(SLAVE.PREFIX)_stall = tx_@$(SLAVE.PREFIX)_stall
+				|| rx_@$(SLAVE.PREFIX)_stall;
+	assign	@$(SLAVE.PREFIX)_ack = tx_@$(SLAVE.PREFIX)_ack
+				|| rx_@$(SLAVE.PREFIX)_ack;
+	assign	@$(SLAVE.PREFIX)_idata = (tx_@$(SLAVE.PREFIX)_ack)
+			? tx_@$(SLAVE.PREFIX)_data : rx_@$(SLAVE.PREFIX)_data;
+
+	assign	rfdbg_ce   = o_gpio[8] ? rxdbg_ce   : txdbg_ce;
+	assign	rfdbg_data = o_gpio[8] ? rxdbg_data : txdbg_data;
+	assign	rfdbg_hist = o_gpio[8] ? rxdbg_hist : txdbg_hist;
+
+@SIM.CLOCK=clk
+@SIM.INCLUDE=
+#include "micnco.h"
+@SIM.DEFNS=
+	MICNCO	*m_mic;
+@SIM.INIT=
+	m_mic = new MICNCO();
+@SIM.TICK=
+	m_core->i_mic_miso= (*m_mic)(m_core->o_mic_sck, m_core->o_mic_csn);

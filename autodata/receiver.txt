@@ -1,0 +1,65 @@
+################################################################################
+##
+## Filename: 	receiver.txt
+##
+## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
+##
+## Purpose:	
+##
+## Creator:	Dan Gisselquist, Ph.D.
+##		Gisselquist Technology, LLC
+##
+################################################################################
+##
+## Copyright (C) 2020, Gisselquist Technology, LLC
+##
+## This program is free software (firmware): you can redistribute it and/or
+## modify it under the terms of the GNU General Public License as published
+## by the Free Software Foundation, either version 3 of the License, or (at
+## your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+## target there if the PDF file isn't present.)  If not, see
+## <http://www.gnu.org/licenses/> for a copy.
+##
+## License:	GPL, v3, as defined and found on www.gnu.org,
+##		http://www.gnu.org/licenses/gpl.html
+##
+##
+################################################################################
+##
+##
+@PREFIX=rx
+@DEVID=RECEIVER
+@DEPENDS=RFSCOPE_ACCESS
+@SLAVE.BUS=wb
+@SLAVE.TYPE=DOUBLE
+@NADDR=4
+@RECEIVER=amdemod
+@MAIN.PORTLIST=
+		// @$(DEVID) I/O ports
+		i_rf_data, o_pwm_audio, o_pwm_shutdown_n, o_pwm_gain
+@MAIN.IODECL=
+	input	wire	[1:0]	i_rf_data;
+	output	wire		o_pwm_audio;
+	output	wire		o_pwm_shutdown_n, o_pwm_gain;
+@MAIN.PARAMS=
+@MAIN.DEFNS=
+	wire		rfdbg_ce;
+	wire	[31:0]	rfdbg_data;
+	wire	[1:0]	rfdbg_sel;
+@MAIN.INSERT=
+	@$(RECEIVER)
+	@$(RECEIVER)i(i_clk, i_reset, audio_en, rf_en,
+		@$(SLAVE.PORTLIST),
+		i_rf_data, o_pwm_audio,
+		rfdbg_sel, rfdbg_ce, rfdbg_data);
+
+	assign	o_pwm_shutdown_n = audio_en;
+	assign	o_pwm_gain = audio_en;

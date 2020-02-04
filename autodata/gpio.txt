@@ -1,0 +1,158 @@
+################################################################################
+##
+## Filename: 	gpio.txt
+##
+## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
+##
+## Purpose:	
+##
+## Creator:	Dan Gisselquist, Ph.D.
+##		Gisselquist Technology, LLC
+##
+################################################################################
+##
+## Copyright (C) 2020, Gisselquist Technology, LLC
+##
+## This program is free software (firmware): you can redistribute it and/or
+## modify it under the terms of the GNU General Public License as published
+## by the Free Software Foundation, either version 3 of the License, or (at
+## your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+## target there if the PDF file isn't present.)  If not, see
+## <http://www.gnu.org/licenses/> for a copy.
+##
+## License:	GPL, v3, as defined and found on www.gnu.org,
+##		http://www.gnu.org/licenses/gpl.html
+##
+##
+################################################################################
+##
+##
+@PREFIX=gpio
+@DEVID=GPIO
+@NADDR=1
+@ACCESS=@$(DEVID)_ACCESS
+@SLAVE.TYPE=SINGLE
+@SLAVE.BUS=wb
+## Outputs:
+##	I2C SDA
+##	I2C SCL
+##	LEDG
+##	LEDR
+##	RF_ENABLE
+##	AUDIO_ENABLE
+##	HIST_SEL0
+##	HIST_SEL1
+## (Not used)
+##	LED_RED
+##	LED_GREEN
+##	LED_BLUE
+## Inputs:
+##	I2C SDA
+##	I2C SCL
+##	BUTTON	(SW1)
+##	BTN0	(SW2)
+##	BTN1	(SW3)
+##	BTN2	(SW4)
+##	(Local)
+##	(Local)
+@$NUMOUTPUT=9
+@$NUMINPUT=6
+@INT.GPIO.WIRE=gpio_int
+## @INT.GPIO.PIC=buspic
+@TOP.PORTLIST=
+		// @$(DEVID) ports
+		io_i2c_scl, io_i2c_sda, o_ledg, o_ledr, i_btn, o_rf_clk
+@TOP.IODECL=
+	// GPIO wires
+	inout	wire		io_i2c_scl, io_i2c_sda;
+	output	wire		o_ledg;
+	output	wire		o_ledr;
+	input	wire	[3:0]	i_btn;
+	output	wire		o_rf_clk;
+@TOP.DEFNS=
+	// GPIO declarations.  The two wire busses are just virtual lists of
+	// input (or output) ports.
+	wire	[@$(NUMINPUT) -1:0]	i_@$(PREFIX);
+	wire	[@$(NUMOUTPUT)-1:0]	o_@$(PREFIX);
+	wire				i_i2c_sda, i_i2c_scl;
+@TOP.MAIN=
+		// GPIO wires
+		i_@$(PREFIX), o_@$(PREFIX)
+@TOP.INSERT=
+	assign	i_gpio = { i_btn[3:1], ~i_btn[0], i_i2c_sda, i_i2c_scl };
+	assign	o_ledg = !o_@$(PREFIX)[2];
+	assign	o_ledr = !o_@$(PREFIX)[3] || !pll_locked;
+
+	i2cio sckz(o_@$(PREFIX)[0], i_i2c_scl, io_i2c_scl);
+	i2cio sdaz(o_@$(PREFIX)[1], i_i2c_sda, io_i2c_sda);
+
+	oclkddr
+	rfclock(s_clk, { o_@$(PREFIX)[4], 1'b0 }, o_rf_clk);
+	
+@MAIN.PORTLIST=
+		// GPIO ports
+		i_@$(PREFIX), o_@$(PREFIX)
+@MAIN.IODECL=
+	localparam	NGPI = @$(NUMINPUT), NGPO=@$(NUMOUTPUT);
+	// @$(DEVID) ports
+	input		[(NGPI-1):0]	i_@$(PREFIX);
+	output	wire	[(NGPO-1):0]	o_@$(PREFIX);
+@MAIN.DEFNS=
+	wire		audio_en, rf_en;
+	// wire	[1:0]	rfdbg_sel;
+@MAIN.INSERT=
+	//
+	// @$(DEVID)
+	//
+	// This interface should allow us to control up to 16 @$(DEVID) inputs,
+	// and another 16 @$(DEVID) outputs.  The interrupt trips when any of
+	// the inputs changes.  (Sorry, which input isn't (yet) selectable.)
+	//
+	localparam	INITIAL_@$(DEVID) = @$(NUMOUTPUT)'h37;
+	wbgpio	#(NGPI, NGPO, INITIAL_@$(DEVID))
+		@$(PREFIX)i(i_clk, @$(SLAVE.PORTLIST),
+			i_@$(PREFIX), o_@$(PREFIX), @$(PREFIX)_int);
+
+	assign	rf_en     = o_@$(PREFIX)[4];
+	assign	audio_en  = o_@$(PREFIX)[5];
+	assign	rfdbg_sel = o_@$(PREFIX)[7:6];
+@REGS.N=1
+@REGS.0= 0 R_@$(DEVID) @$(DEVID) GPI GPO
+@BDEF.DEFN=
+//
+// @$(DEVID) input wires
+//
+#define	@$(DEVID)_IN(WIRE)	(((WIRE)>>16)&1)
+#define	@$(DEVID)_I2C_SCL	0x00001
+#define	@$(DEVID)_I2C_SDA	0x00002
+#define	@$(DEVID)_BTN0		0x00004
+#define	@$(DEVID)_BTN1		0x00008
+#define	@$(DEVID)_BTN2		0x00010
+#define	@$(DEVID)_BTN3		0x00020
+//
+// @$(DEVID) output wires
+//
+#define	@$(DEVID)_SET(WIRE)	(((WIRE)<<16)|(WIRE))
+#define	@$(DEVID)_CLR(WIRE)	 ((WIRE)<<16)
+//
+#define	@$(DEVID)_LEDG		0x000000004
+#define	@$(DEVID)_LEDR		0x000000008
+//
+#define	@$(DEVID)_I2C_SCL_SET	@$(DEVID)_SET(@$(DEVID)_I2C_SCL)
+#define	@$(DEVID)_I2C_SCL_CLR	@$(DEVID)_CLR(@$(DEVID)_I2C_SCL)
+#define	@$(DEVID)_I2C_SDA_SET	@$(DEVID)_SET(@$(DEVID)_I2C_SDA)
+#define	@$(DEVID)_I2C_SDA_CLR	@$(DEVID)_CLR(@$(DEVID)_I2C_SDA)
+@BDEF.IONAME=	i_@$(PREFIX)
+@BDEF.IOTYPE=	unsigned
+@BDEF.OSDEF=	_BOARD_HAS_@$(DEVID)
+@BDEF.OSVAL=	static volatile @$.BDEF.IOTYPE *const _@$(PREFIX) = ((@$.BDEF.IOTYPE *)@$REGBASE);
+@RTL.MAKE.FILES=wbgpio.v i2cio.v oclkddr.v
+@RTL.MAKE.GROUP=@$(DEVID)

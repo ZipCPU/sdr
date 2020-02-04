@@ -1,0 +1,5 @@
+obj_dir
+design.h
+sdr.json
+*.pnrlog
+*.yslog
