@@ -39,7 +39,7 @@
 //
 `default_nettype	none
 //
-module	quadpll(i_clk, i_ld, i_step, i_ce, i_input, i_lgcoeff, o_phase, o_err);
+module	quadpll(i_clk, i_ld, i_step, i_ce, i_input, i_lgcoeff, o_phase, o_err, o_locked);
 	parameter		PHASE_BITS = 32;
 	parameter	[0:0]	OPT_TRACK_FREQUENCY = 1'b1;
 	parameter	[PHASE_BITS-1:0]	INITIAL_PHASE_STEP = 0;
@@ -55,6 +55,7 @@ module	quadpll(i_clk, i_ld, i_step, i_ce, i_input, i_lgcoeff, o_phase, o_err);
 	input	wire	[4:0]		i_lgcoeff;
 	output	wire	[PHASE_BITS-1:0] o_phase;
 	output	reg	[1:0]		o_err;
+	output	reg			o_locked;
 
 	reg		lead;	// lag
 	reg		phase_err;
@@ -94,6 +95,24 @@ module	quadpll(i_clk, i_ld, i_step, i_ce, i_input, i_lgcoeff, o_phase, o_err);
 	4'b0110: { lead, phase_err } = 2'b01;
 	4'b0111: { lead, phase_err } = 2'b00;	// No err
 	endcase
+
+	// A crude lock indicator.  If we are ever off by 180 degrees, then we
+	// clearly aren't locked.  It's crude, because anything between about
+	// -135 and 135 will still appear to be locked, and because the lock
+	// indicator will almost always glitch--but it should be enough to see
+	// it on a trace.
+	always @(posedge i_clk)
+	if (i_ce)
+	begin
+		case({ i_input, ctr[MSB:MSB-1] })
+		//
+		4'b0010: o_locked <= 1'b0;
+		4'b1011: o_locked <= 1'b0;
+		4'b1100: o_locked <= 1'b0;
+		4'b0101: o_locked <= 1'b0;
+		default: o_locked <= 1'b1;	// Everything else
+		endcase
+	end
 
 	// How much we correct our phase by is a function of our loop
 	// coefficient, here represented by 2^{-i_lgcoeff}.
