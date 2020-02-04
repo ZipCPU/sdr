@@ -50,7 +50,7 @@ all:	data
 ## Potential Transmitters
 #
 # RF := qamxmit.txt
-# RF := amxmit.txt
+RF := amxmit.txt
 # RF := fmxmit.txt
 
 ## Potential Receiver
@@ -62,7 +62,7 @@ all:	data
 #
 # RF := wavsim.txt
 # RF := amsim.txt
-RF := fmsim.txt
+# RF := fmsim.txt
 
 DEBUG := histogram.txt rfscope.txt samplerate.txt
 DATA := global.txt clock36.txt version.txt hexbus.txt gpio.txt $(RF) $(DEBUG)

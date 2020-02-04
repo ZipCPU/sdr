@@ -21,10 +21,10 @@ set_io i_mic_miso	46	# MISO 10 P1A9  46 ### Top was ... 3 P1A3 47
 set_io o_mic_sck	44	# SCK   9 P1A10 44 ### Top was ... 4 P1A4 45
 #
 # PMod 1A bottom: AMP2 (5-6 are GND/VCC)
-set_io o_pwm_audio	 3	# 1 P1A7   3
-set_io o_pwm_gain	48	# 2 P1A8  48
+# set_io o_pwm_audio	 3	# 1 P1A7   3
+# set_io o_pwm_gain	48	# 2 P1A8  48
 ### NC - no connect
-set_io o_pwm_shutdown_n 44	# 4 P1A10 44
+# set_io o_pwm_shutdown_n 44	# 4 P1A10 44
 #
 # Assuming sides ...
 # PMod 1B

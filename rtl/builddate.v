@@ -40,6 +40,6 @@
 //
 `ifndef	DATESTAMP
 `define DATESTAMP 32'h20200204
-`define BUILDTIME 32'h00122003
+`define BUILDTIME 32'h00132828
 `endif
 //
