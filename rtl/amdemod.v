@@ -120,6 +120,7 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	reg	[15:0]		write_coeff;
 	wire	[1:0]		pll_err;
 	reg	[15:0]		r_carrier;
+	wire			pll_locked;
 
 	////////////////////////////////////
 	//
@@ -127,8 +128,10 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	//
 
 	initial	pll_lgcoeff  = 5'h2;
-	initial	new_pll_step = 0;
+	initial	new_pll_step = 19'h040_00;
 	initial	load_pll     = 1;
+	initial	r_gain       = 16'h4000;
+	initial	r_carrier    = 16'h0800;
 	always @(posedge i_clk)
 	if (i_wb_stb && i_wb_we)
 	begin
@@ -197,7 +200,7 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 `else
 	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
 		.INITIAL_COEFFS("amdemod.hex"),
-		.NDOWN(RAW_AUDIO_DOWNSAMPLE_RATIO),
+		.NDOWN(SUBFIL_DOWN),
 		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_AUDIO_COEFFS))
 	resample(i_clk, reset_filter, write_audio_filter, write_coeff[15:4],
 		cic_ce, cic_sample_i, cic_sample_q,
@@ -209,11 +212,11 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	// Remove the AM carrier
 	//
 
-	quadpll #(.PHASE_BITS(PLL_PHASE), .OPT_TRACK_FREQUENCY(1'b0),
+	quadpll #(.PHASE_BITS(PLL_PHASE), .OPT_TRACK_FREQUENCY(1'b1),
 		.INITIAL_PHASE_STEP(0)) // i.e. TRACKING FREQUENCY
 	carrier_track(i_clk, load_pll, new_pll_step,
 		baseband_ce, { baseband_i[BB_BITS-1], baseband_q[BB_BITS-1] },
-			pll_lgcoeff, pll_phase, pll_err);
+			pll_lgcoeff, pll_phase, pll_err, pll_locked);
 
 	always @(posedge i_clk)
 		negative_phase <= -pll_phase;
@@ -299,7 +302,7 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	wire	unused;
 	assign	unused = &{ 1'b0, i_wb_cyc, i_wb_sel,
 			cic_ign, splr_busy, negative_phase[3:0],
-			i_rf_en, audio_q, write_coeff[3:0], pll_err,
+			i_rf_en, audio_q, write_coeff[3:0], pll_err, pll_locked,
 			amplified_sample[15:0], minus_carrier[15:0] };
 	// Verilator lint_on  UNUSED
 endmodule

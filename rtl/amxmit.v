@@ -190,7 +190,8 @@ module	amxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 
 		reg	[PWM_BITS-1:0]		sd_integrator;
 		always @(posedge i_clk)
-			sd_integrator <=sd_integrator[PWM_BITS-2:0]+sample_data[PWM_BITS-1:1];
+			sd_integrator <=sd_integrator[PWM_BITS-2:0]
+				+{ !sample_data[PWM_BITS-1], sample_data[PWM_BITS-2:1] };
 
 		always @(posedge  i_clk)
 		if (!i_rf_en)
