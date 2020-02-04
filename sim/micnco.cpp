@@ -45,7 +45,7 @@ MICNCO::MICNCO() { m_phase = 0; m_step = 1; m_last_sck = 1; m_bomb = false; }
 void	MICNCO::step(unsigned s) { m_step = s; }
 int MICNCO::operator()(int sck, int csn) {
 	int	ov;
-	m_phase += (m_step>>4);
+	m_phase += (m_step>>1);
 	m_step  += 1;
 	m_step &= 0x03ffff;
 	if (csn) {

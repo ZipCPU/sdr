@@ -85,11 +85,10 @@ the [constellation](sw/constellation.cpp) program.
 
 As of 20200204, ...
 
-3. The AM receiver works when composed with the transmitter in simulation.
+1. The AM receiver works when composed with the transmitter in simulation.
 	The simulation has no channel model, is only so good, etc., etc.
 	It's a start.
-2. Both FM transmitter and receiver are built, but they don't pass the
-	composed simulation test (yet).
+2. Both FM transmit/receive pair work when composed together in simulation.
 3. The AM transmitter works, and the results can be heard using a Lime
 	SDR radio receiver.  There's an annoying tone present which I haven't
 	yet chased down.

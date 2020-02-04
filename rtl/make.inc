@@ -44,7 +44,7 @@ SCOPE  := $(addprefix $(SCOPED)/,wbscope.v)
 FMSIM := fmxmit.v smpladc.v cicfil.v sintable.v cicfil.v quadpll.v subfildowniq.v
 
 HEXBUSD := hexbus
-HEXBUS  := $(addprefix $(HEXBUSD)/,hbbus.v hbconsole.v hbdechex.v hbdeword.v hbexec.v hbgenhex.v hbidle.v hbints.v hbnewline.v hbpack.v)
+HEXBUS  := $(addprefix $(HEXBUSD)/,hbbus.v hbdechex.v hbdeword.v hbexec.v hbgenhex.v hbidle.v hbints.v hbnewline.v hbpack.v)
 HIST := histogram.v
 
 WBUARTD := wbuart

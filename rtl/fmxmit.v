@@ -4,7 +4,12 @@
 //
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
-// Purpose:	
+// Purpose:	A basic FM transmitter.  It works in stages.  1) Get audio
+//		from the microphone, 2) (optionally) filter that audio with
+//	a CIC filter, 3) multiply it by a user configurable gain, 4) use the
+//	gain data to increment a phase counter, 5) create two phase counters
+//	from that each offset by 90 degrees for I+Q, 6) do a table lookup of
+//	the phases, 7) sigma-delta (or optionally PWM) modulate the result.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -120,9 +125,6 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	wire	[SIN_BITS-1:0]		cos_value, sin_value;
 	wire				cos_ignored, sin_ignored;
 
-	reg	[PWM_BITS-1:0]	sin_value_off;
-	reg	[PWM_BITS-1:0]	cos_value_off;
-
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -143,7 +145,7 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	end else
 		reset_filter <= 1'b0;
 
-	initial	r_gain = 16'h0010;
+	initial	r_gain = 16'h0040;
 	always @(posedge i_clk)
 	if (i_wb_stb && i_wb_we && i_wb_addr == 0)
 		r_gain <= i_wb_data[15:0];
@@ -238,15 +240,6 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	sintable
 	sintbl(i_clk, 1'b0, 1'b1,1'b0, q_counter, sin_value, sin_ignored);
 
-	always @(*)
-	begin
-		cos_value_off = cos_value;
-		sin_value_off = sin_value;
-
-		cos_value_off[PWM_BITS-1] = !cos_value[PWM_BITS-1];
-		sin_value_off[PWM_BITS-1] = !sin_value[PWM_BITS-1];
-	end
-
 	generate if (OPT_SIGMA_DELTA)
 	begin : GENERATE_SIGMA_DELTA
 		reg	[PWM_BITS-1:0]	sigma_delta_i, sigma_delta_q;
@@ -270,7 +263,7 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 				<= sigma_delta_i[PWM_BITS-1:PWM_BITS-2] + 2'b0;
 			endcase
 		end else
-			sigma_delta_i <= sigma_delta_i[PWM_BITS-2:0] + cos_value_off;
+			sigma_delta_i <= sigma_delta_i[PWM_BITS-2:0] + { {(1){!cos_value[11]}}, cos_value[10:1] };
 
 		always @(posedge i_clk)
 		if (direct_rf)
@@ -287,7 +280,7 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 				<= sigma_delta_q[PWM_BITS-1:PWM_BITS-2] + 2'b1;
 			endcase
 		end else
-			sigma_delta_q <= sigma_delta_q[PWM_BITS-2:0] + sin_value_off;
+			sigma_delta_q <= sigma_delta_q[PWM_BITS-2:0] + { {(1){!sin_value[11]}}, sin_value[10:1] };
 
 		always @(posedge i_clk)
 		if (!i_rf_en)
@@ -302,6 +295,21 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 		//
 		integer	k;
 		reg	[PWM_BITS-1:0]	pwm_counter, brev_pwm;
+		reg	[PWM_BITS-1:0]	sin_value_off;
+		reg	[PWM_BITS-1:0]	cos_value_off;
+
+
+		// The PWM modulator below needs signed offset values, not
+		// two's complement ones.  Convert them here.
+		always @(*)
+		begin
+			cos_value_off = cos_value;
+			sin_value_off = sin_value;
+
+			cos_value_off[PWM_BITS-1] = !cos_value[PWM_BITS-1];
+			sin_value_off[PWM_BITS-1] = !sin_value[PWM_BITS-1];
+		end
+
 
 		always @(posedge i_clk)
 			pwm_counter <= pwm_counter + 1;

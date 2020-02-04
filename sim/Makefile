@@ -86,9 +86,11 @@ $(OBJDIR)/%.o: $(VINCD)/%.cpp
 
 .PHONY: hex
 # hex: $(subst $(RTLD)/,,$(wildcard $(RTLD)/*.hex))
-hex: sintable.hex
+hex: sintable.hex amdemod.hex
 # %.hex: $(RTLD)/%.hex
 sintable.hex: $(RTLD)/sintable.hex
+	@bash -c "if [ ! -e $@ ]; then ln -s $< $@ ; fi"
+amdemod.hex: $(RTLD)/amdemod.hex
 	@bash -c "if [ ! -e $@ ]; then ln -s $< $@ ; fi"
 
 #

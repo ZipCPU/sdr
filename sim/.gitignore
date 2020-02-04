@@ -1,4 +1,5 @@
 main_tb
 obj-pc/
 *.hex
+*.vcd
 tags
