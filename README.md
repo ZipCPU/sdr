@@ -7,7 +7,7 @@ idea.
 The goal of this project is to build a gateware design that can transfer audio
 from one radio to another.  The design is built around the
 [icebreaker](https://github.com/icebreaker-fpga/icebreaker) FPGA board,
-the [SX1257 Radio PMod(https://git.xil.se/kbeckmann/SX1257]),
+the [SX1257 Radio PMod](https://github.com/xil-se/SX1257-PMOD),
 the [Digilent MEMS microphone](https://store.digilentinc.com/pmod-mic3-mems-microphone-with-adjustable-gain/)
 and the [Digilent AMP2 PMod](https://store.digilentinc.com/pmod-amp2-audio-amplifier/).
 You can see [a picture of this setup here](doc/radio-set.jpg).
