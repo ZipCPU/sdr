@@ -282,11 +282,10 @@ module	main(i_clk, i_reset,
 
 	always	@(posedge i_clk)
 	casez( wb_sio_addr[1:0] )
-		2'h0: r_wb_sio_data <= wb_buildtime_idata;
-		2'h1: r_wb_sio_data <= wb_gpio_idata;
-		2'h2: r_wb_sio_data <= wb_samplerate_idata;
-		2'h3: r_wb_sio_data <= wb_version_idata;
-		default: r_wb_sio_data <= wb_version_idata;
+	2'h0: r_wb_sio_data <= wb_buildtime_idata;
+	2'h1: r_wb_sio_data <= wb_gpio_idata;
+	2'h2: r_wb_sio_data <= wb_samplerate_idata;
+	2'h3: r_wb_sio_data <= wb_version_idata;
 	endcase
 	assign	wb_sio_idata = r_wb_sio_data;
 

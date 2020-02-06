@@ -1,4 +1,4 @@
-# set_io i_clk_12mhz	35
+set_io i_clk_12mhz	35
 #
 set_io o_ledr		11
 set_io o_ledg		37
