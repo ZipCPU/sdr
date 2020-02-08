@@ -104,10 +104,12 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	reg	[CIC_BITS-1:0]	cic_sample_i, cic_sample_q;
 	wire	[BB_BITS-1:0]	baseband_i, baseband_q;
 	reg	[PWM_BITS-1:0]	pwm_counter, brev_counter;
-	reg	[CORDIC_BITS+16-1:0]		amplified_sample, minus_carrier;
+	reg [CORDIC_BITS+16-1:0] amplified_sample;
 	reg	[15:0]		audio_sample_off;
 	wire			splr_busy, splr_done;
-	wire	signed [CORDIC_BITS-1:0]	audio_i, audio_q;
+	wire signed [CORDIC_BITS-1:0] audio_i, audio_q,
+				w_carrier;
+	reg signed [CORDIC_BITS-1:0] minus_carrier;
 	//
 	wire	[PLL_PHASE-1:0]	pll_phase;
 	reg	[PLL_PHASE-1:0]	negative_phase;
@@ -119,7 +121,6 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	reg			write_audio_filter, reset_filter;
 	reg	[15:0]		write_coeff;
 	wire	[1:0]		pll_err;
-	reg	[15:0]		r_carrier;
 	wire			pll_locked;
 
 	////////////////////////////////////
@@ -131,14 +132,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	initial	new_pll_step = 19'h040_00;
 	initial	load_pll     = 1;
 	initial	r_gain       = 16'h4000;
-	initial	r_carrier    = 16'h0800;
 	always @(posedge i_clk)
 	if (i_wb_stb && i_wb_we)
 	begin
 		{ reset_filter, load_pll, write_coeff } <= 0;
 
 		case(i_wb_addr)
-		2'b00: { r_carrier, r_gain } <= i_wb_data[31:0];
+		2'b00: r_gain <= i_wb_data[15:0];
 		2'b01: { load_pll, new_pll_step } <= { 1'b1,
 					 i_wb_data[30:32-PLL_PHASE] };
 		2'b10: { reset_filter, write_audio_filter, write_coeff }
@@ -157,7 +157,17 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 		o_wb_ack <= !i_reset && i_wb_stb;
 
 	always @(posedge i_clk)
+	begin
 		o_wb_data <= 0;
+		case(i_wb_addr)
+		2'b00:o_wb_data<={ {(16-CORDIC_BITS){w_carrier[CORDIC_BITS-1]}},
+				w_carrier, r_gain };
+		2'b01: o_wb_data[30:32-PLL_PHASE] <= new_pll_step;
+		// No feedback on filter taps
+		2'b11: o_wb_data[4:0] <= pll_lgcoeff;
+		default: o_wb_data <= 0;
+		endcase
+	end
 
 	////////////////////////////////////
 	//
@@ -179,25 +189,6 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	// Downsampling (CIC cleanup)
 	//
 
-`ifdef	BEFORE
-	// Verilator lint_off UNUSED
-	wire	baseband_ign;
-	// Verilator lint_on UNUSED
-
-	subfildown #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
-		.NDOWN(10),
-		.INITIAL_COEFFS("amdemod.hex"),
-		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_AUDIO_COEFFS))
-	resample_i(i_clk, reset_filter, write_audio_filter, write_coeff[15:4],
-		cic_ce, cic_sample_i, baseband_ce, baseband_i);
-
-	subfildown #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
-		.INITIAL_COEFFS("amdemod.hex"),
-		.NDOWN(RAW_AUDIO_DOWNSAMPLE_RATIO),
-		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_AUDIO_COEFFS))
-	resample_q(i_clk, reset_filter, write_audio_filter, write_coeff[15:4],
-		cic_ce, cic_sample_q, baseband_ign, baseband_q);
-`else
 	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
 		.INITIAL_COEFFS("amdemod.hex"),
 		.NDOWN(SUBFIL_DOWN),
@@ -205,7 +196,6 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	resample(i_clk, reset_filter, write_audio_filter, write_coeff[15:4],
 		cic_ce, cic_sample_i, cic_sample_q,
 		baseband_ce, baseband_i, baseband_q);
-`endif
 
 	////////////////////////////////////
 	//
@@ -228,6 +218,12 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 				negative_phase[PLL_PHASE-1:PLL_PHASE-CORDIC_PHASE],
 			splr_busy, splr_done, audio_i, audio_q);
 
+	iiravg #(.IW(CORDIC_BITS), .OW(CORDIC_BITS), .LGALPHA(10))
+	avgcarrier(i_clk, i_reset, baseband_ce, audio_i, w_carrier);
+
+	always @(posedge i_clk)
+		minus_carrier <= audio_i - w_carrier;
+
 	////////////////////////////////////
 	//
 	// Amplify the result
@@ -236,21 +232,18 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	(* mul2dsp *)
 	always @(posedge  i_clk)
 	// if (splr_done)
-		amplified_sample <= audio_i * r_gain;
+		amplified_sample <= minus_carrier * r_gain;
 
 	////////////////////////////////////
 	//
 	// Convert to PWM
 	//
 
-	always @(*)
-		minus_carrier = amplified_sample - { r_carrier, {(CORDIC_BITS){1'b0}} };
-
 	always @(posedge  i_clk)
 	if (splr_done)
 	begin
-		audio_sample_off[14:0] <=  minus_carrier[16+CORDIC_BITS-2:CORDIC_BITS];
-		audio_sample_off[15]   <= !minus_carrier[16+CORDIC_BITS-1];
+		audio_sample_off[14:0] <=  amplified_sample[16+CORDIC_BITS-2:CORDIC_BITS];
+		audio_sample_off[15]   <= !amplified_sample[16+CORDIC_BITS-1];
 	end
 
 	always @(posedge i_clk)
@@ -303,6 +296,6 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	assign	unused = &{ 1'b0, i_wb_cyc, i_wb_sel,
 			cic_ign, splr_busy, negative_phase[3:0],
 			i_rf_en, audio_q, write_coeff[3:0], pll_err, pll_locked,
-			amplified_sample[15:0], minus_carrier[15:0] };
+			amplified_sample[15:0] };
 	// Verilator lint_on  UNUSED
 endmodule

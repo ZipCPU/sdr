@@ -1,13 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	builddate.v
+// Filename: 	iiravg.v
 //
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
-// Purpose:	This file records the date of the last build.  Running "make"
-//		in the main directory will create this file.  The `define found
-//	within it then creates a version stamp that can be used to tell which
-//	configuration is within an FPGA and so forth.
+// Purpose:	Implements a simple recursive filter.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -27,7 +24,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the 1000 4 20 24 27 30 46 113 128 129 999 1000ROOT)/doc directory.  Run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -38,8 +35,32 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-`ifndef	DATESTAMP
-`define DATESTAMP 32'h20200208
-`define BUILDTIME 32'h00181338
-`endif
+`default_nettype	none
 //
+module	iiravg(i_clk, i_reset, i_ce, i_data, o_data);
+	parameter	IW=15, OW=16, LGALPHA=4;
+	parameter	AW=(IW > OW ? IW : OW) +LGALPHA;
+	parameter	[AW-1:0]	RESET_VALUE = 0;
+	//
+	input	wire	i_clk, i_reset, i_ce;
+	input	wire	[(IW-1):0]	i_data;
+	output	wire	[(OW-1):0]	o_data;
+
+	wire	signed [(AW-1):0]	difference;
+	reg	[(AW-1):0]	r_average, adjustment;
+
+	assign	difference = { i_data, {(AW-IW){1'b0}} } - r_average;
+
+	always @(posedge i_clk)
+		adjustment <= { {(LGALPHA){(difference[(AW-1)])}},
+				difference[(AW-1):LGALPHA] };
+
+	always @(posedge i_clk)
+	if (i_reset)
+		r_average <= RESET_VALUE;
+	else if (i_ce)
+		r_average <= r_average + adjustment;
+
+	assign	o_data = r_average[AW-1:AW-OW];
+
+endmodule

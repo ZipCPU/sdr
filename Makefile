@@ -137,6 +137,7 @@ rtl: check-verilator
 .PHONY: rtl-sim
 rtl-sim:
 	+@$(SUBMAKE) rtl sim
+	+@$(SUBMAKE) sim
 
 .PHONY: bin
 bin:

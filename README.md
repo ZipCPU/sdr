@@ -31,7 +31,7 @@ Beware, if you use any of the composed simulations, such as the AM transmitter
 followed by the AM demodulator, you will run into a problem where the microphone
 and the amplifier are both attempting to use the same pins.  The solution
 is not to build the composed (transmit/receive) design in rtl.  Instead,
-run `make rtl-sim` followed by `make -C sim` to build the full simulation.
+run `make rtl-sim` to build the full simulation.
 
 ## Running in Simulation
 

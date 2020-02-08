@@ -53,13 +53,14 @@
 @MAIN.DEFNS=
 	wire		rfdbg_ce;
 	wire	[31:0]	rfdbg_data;
+	wire	[9:0]	rfdbg_hist;
 	wire	[1:0]	rfdbg_sel;
 @MAIN.INSERT=
 	@$(RECEIVER)
 	@$(RECEIVER)i(i_clk, i_reset, audio_en, rf_en,
 		@$(SLAVE.PORTLIST),
 		i_rf_data, o_pwm_audio,
-		rfdbg_sel, rfdbg_ce, rfdbg_data);
+		rfdbg_sel, rfdbg_ce, rfdbg_data, rfdbg_hist);
 
 	assign	o_pwm_shutdown_n = audio_en;
 	assign	o_pwm_gain = audio_en;

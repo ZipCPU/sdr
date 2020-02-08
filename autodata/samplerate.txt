@@ -46,29 +46,46 @@
 @CKWIRE= @$(SLAVE.BUS.CLOCK.WIRE)
 @CLKFREQ=@$(SLAVE.BUS.CLOCK.FREQUENCY)
 @MAIN.DEFNS=
-	reg	[31:0]	r_@$(PREFIX)_counter, r_@$(PREFIX)_counts,
-			r_@$(PREFIX)_result;
+	reg	[$clog2(@$(SLAVE.BUS.CLOCK.FREQUENCY))-1:0]
+			r_@$(PREFIX)_counter, r_@$(PREFIX)_counts;
+	reg	[31:0]	r_@$(PREFIX)_result;
+	reg		r_@$(PREFIX)_restart;
 
 @MAIN.INSERT=
 	initial	r_@$(PREFIX)_counter = 0;
+	initial	r_@$(PREFIX)_restart = 1;
+	always @(posedge  i_clk)
+	/*
+	if (i_reset)
+	begin
+		r_@$(PREFIX)_restart <= 1;
+		r_@$(PREFIX)_counter <= 0;
+	end else
+	*/ begin
+		if (r_@$(PREFIX)_restart)
+			r_@$(PREFIX)_counter <= 0;
+		else
+			r_@$(PREFIX)_counter <= r_@$(PREFIX)_counter + 1;
+
+		r_@$(PREFIX)_restart <= (r_@$(PREFIX)_counter == @$(CLKFREQ)-2);
+	end
+
 	initial	r_@$(PREFIX)_counts  = 0;
 	initial	r_@$(PREFIX)_result  = 0;
 	always @(posedge  i_clk)
-	if (i_reset)
+	// if (i_reset)
+	// begin
+	//	r_@$(PREFIX)_counts  <= 0;
+	//	r_@$(PREFIX)_result  <= 0;
+	// end else
+	if (r_@$(PREFIX)_restart)
 	begin
-		r_@$(PREFIX)_counter <= 0;
-		r_@$(PREFIX)_counts  <= 0;
-		r_@$(PREFIX)_result  <= 0;
-	end else if (r_@$(PREFIX)_counter < @$(CLKFREQ)-2)
-	begin
-		r_@$(PREFIX)_counter <= r_@$(PREFIX)_counter + 1;
-		if (rfdbg_ce)
-			r_@$(PREFIX)_counts <= r_@$(PREFIX)_counts + 1;
-	end else begin
-		r_@$(PREFIX)_counter <= 0;
-		r_@$(PREFIX)_counts  <= 0;
-		r_@$(PREFIX)_result  <= r_@$(PREFIX)_counts + (rfdbg_ce ? 1:0);
-	end
+		r_@$(PREFIX)_counts <= 0;
+		r_@$(PREFIX)_result <= 0;
+		r_@$(PREFIX)_result[$clog2(@$(SLAVE.BUS.CLOCK.FREQUENCY))-1:0]
+			<= r_@$(PREFIX)_counts + (rfdbg_ce ? 1:0);
+	end else if (rfdbg_ce)
+		r_@$(PREFIX)_counts <= r_@$(PREFIX)_counts + 1;
 
 	assign @$(SLAVE.PREFIX)_stall = 1'b0;
 	assign @$(SLAVE.PREFIX)_ack   = @$(SLAVE.PREFIX)_stb;

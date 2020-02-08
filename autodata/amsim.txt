@@ -50,5 +50,4 @@
 @REGS.7=7 R_AMPLL    AMFPLL
 @RTL.MAKE.GROUP=AMSIM
 @RTL.MAKE.FILES=amxmit.v smpladc.v cicfil.v amdemod.v cicfil.v
-		quadpll.v subfildowniq.v seqcordic.v
-
+		quadpll.v subfildowniq.v seqcordic.v iiravg.v

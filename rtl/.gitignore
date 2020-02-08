@@ -3,3 +3,5 @@ design.h
 sdr.json
 *.pnrlog
 *.yslog
+*.asc
+*.bin

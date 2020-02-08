@@ -130,8 +130,10 @@ module	main(i_clk, i_reset,
 	// various components comprising the design.
 	//
 // Looking for string: MAIN.DEFNS
-	reg	[31:0]	r_samplerate_counter, r_samplerate_counts,
-			r_samplerate_result;
+	reg	[$clog2(36000000)-1:0]
+			r_samplerate_counter, r_samplerate_counts;
+	reg	[31:0]	r_samplerate_result;
+	reg		r_samplerate_restart;
 
 	// Remove this scope tag via inheritance when/if you connect the
 	// scope interrupt
@@ -471,24 +473,39 @@ module	main(i_clk, i_reset,
 	// zero if the component is not included.
 	//
 	initial	r_samplerate_counter = 0;
+	initial	r_samplerate_restart = 1;
+	always @(posedge  i_clk)
+	/*
+	if (i_reset)
+	begin
+		r_samplerate_restart <= 1;
+		r_samplerate_counter <= 0;
+	end else
+	*/ begin
+		if (r_samplerate_restart)
+			r_samplerate_counter <= 0;
+		else
+			r_samplerate_counter <= r_samplerate_counter + 1;
+
+		r_samplerate_restart <= (r_samplerate_counter == 36000000-2);
+	end
+
 	initial	r_samplerate_counts  = 0;
 	initial	r_samplerate_result  = 0;
 	always @(posedge  i_clk)
-	if (i_reset)
+	// if (i_reset)
+	// begin
+	//	r_samplerate_counts  <= 0;
+	//	r_samplerate_result  <= 0;
+	// end else
+	if (r_samplerate_restart)
 	begin
-		r_samplerate_counter <= 0;
-		r_samplerate_counts  <= 0;
-		r_samplerate_result  <= 0;
-	end else if (r_samplerate_counter < 36000000-2)
-	begin
-		r_samplerate_counter <= r_samplerate_counter + 1;
-		if (rfdbg_ce)
-			r_samplerate_counts <= r_samplerate_counts + 1;
-	end else begin
-		r_samplerate_counter <= 0;
-		r_samplerate_counts  <= 0;
-		r_samplerate_result  <= r_samplerate_counts + (rfdbg_ce ? 1:0);
-	end
+		r_samplerate_counts <= 0;
+		r_samplerate_result <= 0;
+		r_samplerate_result[$clog2(36000000)-1:0]
+			<= r_samplerate_counts + (rfdbg_ce ? 1:0);
+	end else if (rfdbg_ce)
+		r_samplerate_counts <= r_samplerate_counts + 1;
 
 	assign wb_samplerate_stall = 1'b0;
 	assign wb_samplerate_ack   = wb_samplerate_stb;

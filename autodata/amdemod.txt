@@ -40,7 +40,7 @@
 @INCLUDEFILE=receiver.txt
 @RECEIVER=amdemod
 @RTL.MAKE.GROUP=AMDEMOD
-@RTL.MAKE.FILES=amdemod.v cicfil.v quadpll.v subfildowniq.v seqcordic.v
+@RTL.MAKE.FILES=amdemod.v cicfil.v quadpll.v subfildowniq.v seqcordic.v iiravg.v
 @REGS.N=4
 @REGS.0=0 R_AMGAIN AMGAIN
 @REGS.1=1 R_AMFREQ AMFREQ
