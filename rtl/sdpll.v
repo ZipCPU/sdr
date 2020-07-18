@@ -2,7 +2,7 @@
 //
 // Filename: 	sdpll.v
 //
-// Project:	A collection of phase locked loop (PLL) related projects
+// Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This is simplest, 1-clock DPLL that I can think of building.
 //		It doesn't use an arctan for a phase detector, but rather

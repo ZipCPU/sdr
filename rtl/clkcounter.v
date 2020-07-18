@@ -2,7 +2,7 @@
 //
 // Filename: 	clkcounter.v
 //
-// Project:	GDR, a basic Gateware Defined Radio architecture
+// Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	Given a clock, asynchronous to the main or system clock, and
 //		given a PPS strobe that is synchronous to the main clock, count
@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2019, Gisselquist Technology, LLC
+// Copyright (C) 2019-2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
