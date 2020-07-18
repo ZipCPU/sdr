@@ -386,6 +386,8 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 		o_wb_data = o_dbg_data;
 	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, i_wb_cyc, i_wb_sel,
@@ -394,4 +396,5 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 			amplified_sample[15:0], fm_step[23:16],
 			write_audio_filter, write_coeff, pll_locked };
 	// Verilator lint_on  UNUSED
+	// }}}
 endmodule
