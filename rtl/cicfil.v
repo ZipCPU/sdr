@@ -65,6 +65,17 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 	reg	[(IW+LGMEM-1):0]	dec[0:STAGES];
 	reg	[(IW+LGMEM-1):0]	pre_rounded_result;
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cascaded intgration section
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	//
+	// Start by adding bits to ACC
+	//
 	initial	acc[0] = 0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -81,12 +92,23 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 		if (i_reset)
 			acc[k] <= 0;
 		else if (i_ce)
+			//
+			// Apply a filter, H_k(z) = z^{-1} / [ 1 -  z^{-1} ]
+			//
 			acc[k] <= acc[k] + acc[k-1];
 
 	end endgenerate
 
+	////////////////////////////////////////////////////////////////////////
 	//
-	// Calculate our new clock
+	// Calculate our decimated clock enable signal
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	//
+	// Calculate our new CE signal, o_ce
 	//
 	initial	{ o_ce, ctr } = 0;
 	always @(posedge i_clk)
@@ -105,9 +127,25 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 	end else
 		o_ce <= 1'b0;
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cascaded dump section
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	//
+	// Start with the result of the last stage of the accumulator
+	//
 	always @(*)
 		dec[0] = acc[STAGES];
 
+	//
+	// Apply k stages of H_k(z) below, achieving a transform of
+	//
+	// H_dec(z) = [ H_k(z) ]^(STAGES)
+	//
 	generate for(k=1; k<STAGES+1; k=k+1)
 	begin : CIC_DECIMATION_GEN_LOOP
 
@@ -119,23 +157,42 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 			r_dmem[k] <= 0;
 		end else if (o_ce)
 		begin
+			//
+			// Filter H_k(z) = 1 - z^{-1}
+			// Takes place *after* decimation, so it acts like
+			// a filter of 1 - z^{-N} in the Z-transform space of
+			// before decimation
+			//
 			dec[k]    <= dec[k-1] - r_dmem[k];
 			r_dmem[k] <= dec[k-1];
 		end
 
 	end endgenerate
 
-	// convround #(IW+LGMEM,OW,SHIFT)
-	// mkresult(i_clk,o_ce,dec[STAGES-1],o_val);
+	//
+	// Rename the final answer
+	//
 	always @(*)
 		pre_rounded_result = dec[STAGES];
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Report the result(s)
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	initial	o_val = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		o_val <= 0;
 	else if (o_ce)
 		o_val <= pre_rounded_result[IW+LGMEM-SHIFT-1:IW+LGMEM-SHIFT-OW];
+
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+
 
 	// Verilator lint_off UNUSED
 	wire	unused;
