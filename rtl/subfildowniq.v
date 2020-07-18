@@ -243,7 +243,9 @@ module	subfildowniq(i_clk, i_reset, i_wr_coeff, i_coeff,
 
 	initial	last_coeff = 0;
 	always @(posedge i_clk)
+		// Verilator lint_off WIDTH
 		last_coeff <= (!last_coeff && running && tidx >= NCOEFFS-2);
+		// Verilator lint_on  WIDTH
 
 	initial	tidx = 0;
 	initial running = 0;

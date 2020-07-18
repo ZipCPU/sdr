@@ -124,9 +124,12 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	wire	[1:0]		pll_err;
 	wire			pll_locked;
 
-	////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
-	// Bus
+	// Incoming Bus processing
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	initial	pll_lgcoeff  = 5'h05;
 	initial	new_pll_step = DEFAULT_PLL_STEP[PLL_BITS-2:0];
@@ -155,13 +158,13 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 
 	always @(posedge i_clk)
 		o_wb_ack <= !i_reset && i_wb_stb;
-
-	always @(posedge i_clk)
-		o_wb_data <= 0;
-
-	////////////////////////////////////
+	//  }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// CIC Filters
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 `ifdef	ALT_INCOMING_CIC
 	reg	[7+2-1:0]	cic_acci	[0:7];
@@ -230,10 +233,13 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	cicq(i_clk, reset_filter, CIC_DOWN[6:0], 1'b1, i_rf_data[0] ? 2'b01 : 2'b11, cic_ign, cic_sample_q);
 
 `endif	// ALT_INCOMING_CIC
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Track the FM carrier
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	quadpll #(.PHASE_BITS(PLL_BITS), .OPT_TRACK_FREQUENCY(1'b1),
@@ -287,22 +293,14 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	end else
 		step_ce <= 0;
 `endif
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Downsampling (PLL cleanup)
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
-
-/*
-	subfildown #(.IW(BB_BITS), .OW(BB_BITS), .CW(12),
-		.INITIAL_COEFFS("amdemod.hex"),
-		.NDOWN(SECONDARY_DOWNSAMPLE_RATIO),
-		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_AUDIO_COEFFS))
-	resample(i_clk, reset_filter,
-		write_audio_filter, write_coeff[15:4],
-		cic_ce, fm_step[PLL_BITS-1:PLL_BITS-BB_BITS],
-		baseband_ce, baseband_sample);
-*/
+	//
 
 	subfildown #(.IW(BB_BITS), .OW(BB_BITS), .CW(12),
 		.INITIAL_COEFFS("amdemod.hex"),
@@ -314,20 +312,26 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 		// cic_ce, cic_step[7][PLL_BITS+7-3-1:PLL_BITS+7-3-BB_BITS],
 		cic_ce, fm_step[PLL_BITS-1:PLL_BITS-BB_BITS],
 		baseband_ce, baseband_sample);
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Amplify the result
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	(* mul2dsp *)
 	always @(posedge  i_clk)
 	// if (splr_done)
 		amplified_sample <= baseband_sample[15:0] * r_gain;
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Convert to PWM
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	always @(posedge  i_clk)
@@ -350,9 +354,13 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	else
 		o_pwm_audio <= (brev_counter < audio_sample_off);
 
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Create the debugging outputs
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	always @(posedge i_clk)
@@ -374,8 +382,9 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	default: { o_dbg_ce, o_dbg_data, o_dbg_hist } <= 0;
 	endcase
 
-	always @(posedge i_clk)
-		o_dbg_hist <= 0;
+	always @(*)
+		o_wb_data = o_dbg_data;
+	// }}}
 
 	// Verilator lint_off UNUSED
 	wire	unused;
