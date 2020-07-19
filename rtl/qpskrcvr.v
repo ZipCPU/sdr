@@ -38,15 +38,16 @@
 `default_nettype	none
 //
 module	qpskrcvr #(
+		// {{{
 		parameter	CLOCK_FREQUENCY_HZ = 36_000_000,
-		parameter	BASEBAND_SAMPLE_RATE_HZ = 512_000,
+		parameter	BASEBAND_SAMPLE_RATE_HZ
+						= CLOCK_FREQUENCY_HZ / (17 * 4),
 		parameter	CIC_SAMPLE_RATE_HZ = BASEBAND_SAMPLE_RATE_HZ* 4,
-		localparam	CIC_DOWN = CLOCK_FREQUENCY_HZ
-						/ CIC_SAMPLE_RATE_HZ,
-		localparam	RESAMPLE_DOWN = CIC_SAMPLE_RATE_HZ
-						/ BASEBAND_SAMPLE_RATE_HZ,
+		localparam	CIC_DOWN = 17,
+		localparam	RESAMPLE_DOWN = 4,
 		//
 		localparam	CIC_BITS = 7
+		// }}}
 	) (
 		// {{{
 		input	wire		i_clk, i_reset,
@@ -74,13 +75,6 @@ module	qpskrcvr #(
 	);
 	//
 
-	////////////////////////////////////////////////////////////////////////
-	//
-	// Incoming bus processing
-	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
 	localparam	PHASE_BITS=16;
 	localparam [PHASE_BITS-1:0] SYMBOL_STEP
 				= { 3'b001, {(PHASE_BITS-3){1'b0}} };
@@ -90,6 +84,7 @@ module	qpskrcvr #(
 	localparam	FC_BITS = 8;
 	localparam	PWM_BITS = 8;
 	localparam	NUM_DOWNSAMPLE_COEFFS = 31 * 4;
+	localparam	PULSE_SHAPE_FILTER = "pshape8x.hex";
 
 	reg	[2:0]			high_symbol_phase;
 	reg				load_pll;
@@ -97,7 +92,29 @@ module	qpskrcvr #(
 	reg	[4:0]			pll_lgcoeff;
 	reg				reset_downsampler, write_downsampler;
 	reg	[15:0]			write_coeff;
+	wire			cic_ce, cic_ign;
+	wire	[CIC_BITS-1:0]	cic_sample_i, cic_sample_q;
 
+	wire				baseband_ce;
+	wire	signed	[BB_BITS-1:0]	baseband_i, baseband_q;
+
+	reg	signed	[2*BB_BITS-1:0]	baseband_i_squared, baseband_q_squared;
+	reg		[2*BB_BITS:0]	am_detect;
+	wire	[2:0]			past_high_symbol_phase;
+	reg				symbol_ce;
+	reg	signed [BB_BITS-1:0]	symbol_i, symbol_q;
+	wire				amfil_sample;
+	wire	[PHASE_BITS-1:0]	sym_phase;
+	reg	[2:0]			last_sym_phase, short_phase;
+	wire	[1:0]			sym_err;
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Incoming bus processing
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	always @(*)
 		high_symbol_phase = 3'h0;
 
@@ -136,16 +153,14 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Come down from CLOCK_FREQUENCY_HZ down to 512ksps
-	wire			cic_ce, cic_ign;
-	wire	[CIC_BITS-1:0]	cic_sample_i, cic_sample_q;
 
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4),
-		.LGMEM(28), .SHIFT(10)
+		.LGMEM(28), .SHIFT(14)
 	) cici(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1, i_rf_data[1] ? 2'b01: 2'b11,
 			cic_ce, cic_sample_i);
 
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4),
-		.LGMEM(28), .SHIFT(10)
+		.LGMEM(28), .SHIFT(14)
 	) cicq(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1, i_rf_data[0] ? 2'b01: 2'b11,
 			cic_ign, cic_sample_q);
 	// }}}
@@ -156,12 +171,10 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Need to come down to 8x per symbol, or 512ksps total
+	//
 
-	wire				baseband_ce;
-	wire	signed	[BB_BITS-1:0]	baseband_i, baseband_q;
-
-	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
-		.INITIAL_COEFFS(0),
+	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(6),
+		.INITIAL_COEFFS(PULSE_SHAPE_FILTER),
 		.NDOWN(RESAMPLE_DOWN),
 		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_DOWNSAMPLE_COEFFS)
 	) resample(i_clk,
@@ -176,73 +189,70 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	localparam	AMFIL_BITS = 2*BB_BITS+4;
+	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:3];
+	reg	signed	[AMFIL_BITS-1:0]	filtered_detect, last_filtered;
+	reg	[3:0]	fchain_ce;
+
 
 	// Measure | demod_i^2  + demod_q^2 |
 	//
 	// Filter with (1 + sqrt(2)*z^-1 + z^-2) * (1 - z^-4)
 	//	Sqrt(2) * 256 ~= 1_0110_1010, so sqrt(2) ~= 1.011....
 	//	So we can try approximating 1.414 with 1.5
-	reg	signed	[2*BB_BITS-1:0]	baseband_i_squared, baseband_q_squared;
-	reg				square_sum_ce;
-	reg	signed	[2*BB_BITS:0]	am_detect;
-	reg	signed	[2*BB_BITS:0]	am_lag [0:1];
-	reg	signed	[2*BB_BITS+1:0]	am_sum [0:5];
-	reg	signed	[2*BB_BITS+2:0]	filtered_detect;
-	wire	[2:0]			past_high_symbol_phase;
-	reg				symbol_ce;
-	reg	signed [BB_BITS-1:0]	symbol_i, symbol_q;
-	wire				amfil_sample;
-	wire	[PHASE_BITS-1:0]	sym_phase;
-	reg	[2:0]			last_sym_phase, short_phase;
-	wire	[1:0]			sym_err;
-
 	always @(posedge i_clk)
 	if (baseband_ce)
-	begin
 		baseband_i_squared <= baseband_i * baseband_i;
-		baseband_q_squared <= baseband_q * baseband_q;
-		square_sum_ce <= 1'b1;
-	end else
-		square_sum_ce <= 1'b0;
-
-	always @(posedge i_clk)
-	if (square_sum_ce)
-		am_detect <= baseband_i_squared + baseband_q_squared;
 
 	always @(posedge i_clk)
 	if (baseband_ce)
-	begin
-		am_lag[0] <= am_detect;
-		am_lag[1] <= am_lag[0];
-	end
+		baseband_q_squared <= baseband_q * baseband_q;
+
+	always @(posedge i_clk)
+	if (baseband_ce)
+		fchain_ce <= 1;
+	else
+		fchain_ce <= fchain_ce << 1;
+
+	always @(posedge i_clk)
+	if (fchain_ce[0])
+		am_detect <= baseband_i_squared + baseband_q_squared;
 
 	//
 	// Generate a filtered_detect signal
 	//
 	always @(posedge i_clk)
-	if (baseband_ce)
+	if (fchain_ce[0])
 	begin
-		//	reg	signed	[2*BB_BITS:0]	am_detect;
-		//	reg	signed	[2*BB_BITS:0]	am_lag [0:1];
+	// reg		[2*BB_BITS:0]	am_detect;
+		am_sum[0] <= { {(AMFIL_BITS-(2*BB_BITS+1)){1'b0} }, am_detect }
+					+ filtered_detect;
 		// Verilator lint_off WIDTH
-		am_sum[0] <= am_detect + (am_lag[0] >>> 1);
-		// Verilator lint_on  WIDTH
-		am_sum[1] <= am_lag[0] + am_lag[1];
-		am_sum[2] <= am_sum[1];
-		am_sum[3] <= am_sum[2];
-		am_sum[4] <= am_sum[3];
-		am_sum[5] <= am_sum[4];
-		filtered_detect <= am_sum[5] - am_sum[1];
+		am_sum[1] <= filtered_detect + (filtered_detect >>> 1);
+		am_sum[2] <= last_filtered - (last_filtered >>> 5);
 	end
 
-	assign	amfil_sample = filtered_detect[2*BB_BITS+2];
+	always @(posedge i_clk)
+	if (fchain_ce[1])
+		am_sum[3] <= am_sum[0] + (am_sum[1] >>> 2);
+	// Verilator lint_on  WIDTH
+
+	always @(posedge i_clk)
+	if (fchain_ce[2])
+	begin
+		filtered_detect <= am_sum[3] - am_sum[2];
+		last_filtered <= filtered_detect;
+	end
+
+	assign	amfil_sample = filtered_detect[AMFIL_BITS-1];
 
 	// Apply a PLL
 	sdpll	#(
 		.PHASE_BITS(PHASE_BITS),
+		.OPT_TRACK_FREQUENCY(1'b0),
 		.INITIAL_PHASE_STEP(SYMBOL_STEP)
 	) symbol_pll(i_clk, load_pll, new_pll_step[PHASE_BITS-2:0],
-		baseband_ce, amfil_sample, pll_lgcoeff, sym_phase, sym_err);
+		fchain_ce[3], amfil_sample, pll_lgcoeff, sym_phase, sym_err);
 
 	assign	short_phase = sym_phase[PHASE_BITS-1:PHASE_BITS-3];
 	
