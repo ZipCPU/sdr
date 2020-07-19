@@ -37,60 +37,53 @@
 //
 `default_nettype	none
 //
-module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
+module	amdemod #(
+		parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
+		parameter [31:0]	RAW_DATA_RATE_HZ = 960_000,
+		parameter [31:0]	AUDIO_SAMPLE_RATE_HZ = 48_000,
+		parameter		NUM_AUDIO_COEFFS = 666,
+		parameter		HIST_BITS = 10,
+		//
+		//
+		// Verilator lint_off REALCVT
+		localparam real 	MIC_STEP_R = (4.0 * (1<<30)) * RAW_DATA_RATE_HZ
+						* 1.0 / CLOCK_FREQUENCY_HZ,
+		localparam [31:0]	MIC_STEP = MIC_STEP_R,
+		// Verilator lint_on REALCVT
+		localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO
+			= CLOCK_FREQUENCY_HZ / AUDIO_SAMPLE_RATE_HZ, // == 750
+		localparam 	CIC_DOWN = 50,
+		localparam		SUBFIL_DOWN
+				= RAW_AUDIO_DOWNSAMPLE_RATIO / CIC_DOWN
+	) (
+		input	wire		i_clk, i_reset,
+		input	wire		i_audio_en, i_rf_en,
+		//
 		// Wishbone interface
-		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
-			o_wb_stall, o_wb_ack, o_wb_data,
+		input	wire		i_wb_cyc, i_wb_stb, i_wb_we,
+		input	wire [1:0]	i_wb_addr,
+		input	wire [31:0]	i_wb_data,
+		input	wire	[3:0]	i_wb_sel,
+		output	reg		o_wb_stall,
+		output	reg		o_wb_ack,
+		output	reg	[31:0]	o_wb_data,
 		//
 		// Receive interface
-		i_rf_data,
+		input	wire	[1:0]	i_rf_data,
 		//
-		// PWM interface
-		o_pwm_audio,
+		// Outgoing PWM interface
+		output	reg		o_pwm_audio,
 		//
 		// Debug interface
-		i_dbg_sel, o_dbg_ce, o_dbg_data, o_dbg_hist);
+		input	wire	[1:0]	i_dbg_sel,
+		output	reg		o_dbg_ce,
+		output	reg	[31:0]	o_dbg_data,
+		output reg [HIST_BITS-1:0] o_dbg_hist
+	);
 	//
-	parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000;
-	parameter [31:0]	RAW_DATA_RATE_HZ = 960_000;
-	parameter [31:0]	AUDIO_SAMPLE_RATE_HZ = 48_000;
-	parameter		NUM_AUDIO_COEFFS = 666;
-	parameter		HIST_BITS = 10;
-	//
-	//
-	// Verilator lint_off REALCVT
-	localparam real 	MIC_STEP_R = (4.0 * (1<<30)) * RAW_DATA_RATE_HZ
-					* 1.0 / CLOCK_FREQUENCY_HZ ;
-	localparam [31:0]	MIC_STEP = MIC_STEP_R;
-	// Verilator lint_on REALCVT
-	localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO = CLOCK_FREQUENCY_HZ / AUDIO_SAMPLE_RATE_HZ; // == 750
-	localparam 	CIC_DOWN = 50;
-	localparam		SUBFIL_DOWN = RAW_AUDIO_DOWNSAMPLE_RATIO / CIC_DOWN;
-	//
-	input	wire		i_clk, i_reset;
-	input	wire		i_audio_en, i_rf_en;
-	//
-	// Wishbone interface
-	input	wire		i_wb_cyc, i_wb_stb, i_wb_we;
-	input	wire [1:0]	i_wb_addr;
-	input	wire [31:0]	i_wb_data;
-	input	wire	[3:0]	i_wb_sel;
-	output	reg		o_wb_stall;
-	output	reg		o_wb_ack;
-	output	reg	[31:0]	o_wb_data;
-	//
-	// Receive interface
-	input	wire	[1:0]	i_rf_data;
-	//
-	// Outgoing PWM interface
-	output	reg		o_pwm_audio;
-	//
-	// Debug interface
-	input	wire	[1:0]	i_dbg_sel;
-	output	reg		o_dbg_ce;
-	output	reg	[31:0]	o_dbg_data;
-	output reg [HIST_BITS-1:0] o_dbg_hist;
-	//
+
+	// Declare signals  and registers
+	// {{{
 	integer	k;
 
 	localparam	CIC_BITS = 10;
@@ -122,10 +115,14 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	reg	[15:0]		write_coeff;
 	wire	[1:0]		pll_err;
 	wire			pll_locked;
+	// }}}
 
-	////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
-	// Bus
+	// Bus inputs
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	initial	pll_lgcoeff  = 5'h2;
@@ -168,10 +165,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 		default: o_wb_data <= 0;
 		endcase
 	end
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// CIC Filters
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4), .LGMEM(28), .SHIFT(6))
@@ -183,10 +183,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	cicq(i_clk, reset_filter, CIC_DOWN[6:0], 1'b1,
 				i_rf_data[0] ? 2'b01 : 2'b11,
 				cic_ign, cic_sample_q);
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Downsampling (CIC cleanup)
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
@@ -197,9 +200,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 		cic_ce, cic_sample_i, cic_sample_q,
 		baseband_ce, baseband_i, baseband_q);
 
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Remove the AM carrier
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	quadpll #(.PHASE_BITS(PLL_PHASE), .OPT_TRACK_FREQUENCY(1'b1),
@@ -223,10 +230,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 
 	always @(posedge i_clk)
 		minus_carrier <= audio_i - w_carrier;
-
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Amplify the result
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	(* mul2dsp *)
@@ -234,9 +244,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	// if (splr_done)
 		amplified_sample <= minus_carrier * r_gain;
 
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Convert to PWM
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	always @(posedge  i_clk)
@@ -259,9 +273,13 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	else
 		o_pwm_audio <= (brev_counter < audio_sample_off);
 
-	////////////////////////////////////
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Create the debugging outputs
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	always @(posedge i_clk)
@@ -290,7 +308,10 @@ module	amdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 			16'h0, audio_sample_off[15:0],
 			audio_sample_off[15:16-HIST_BITS] };
 	endcase
+	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, i_wb_cyc, i_wb_sel,

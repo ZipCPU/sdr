@@ -129,6 +129,9 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Bus interface
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	initial	direct_rf = 0;
@@ -150,9 +153,13 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	if (i_wb_stb && i_wb_we && i_wb_addr == 0)
 		r_gain <= i_wb_data[15:0];
 
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Audio capture
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	//
@@ -171,10 +178,13 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	audio_adc(i_clk, mic_ce, mic_ce, i_audio_en,
 		o_mic_csn, o_mic_sck, i_mic_miso,
 		{ mic_ignore, mic_valid, mic_data });
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Optional CIC filter
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	generate if (OPT_CIC_FILTER)
 	begin : FM_CIC_FILTER
@@ -192,10 +202,13 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 		assign	cic_sample = { mic_data, {(CIC_BITS-MIC_BITS){1'b0}} };
 
 	end endgenerate
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Gain stage
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	(* mul2dsp *)
 	always @(posedge i_clk)
@@ -206,10 +219,13 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	begin
 		gain_data_wide = gain_data[CIC_BITS+GAIN_BITS-1:CIC_BITS+GAIN_BITS-PHASE_BITS];
 	end
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// FM Modulation
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 
 	//
@@ -239,9 +255,18 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 
 	sintable
 	sintbl(i_clk, 1'b0, 1'b1,1'b0, q_counter, sin_value, sin_ignored);
+	// }}}
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Sigma delta output generation
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	generate if (OPT_SIGMA_DELTA)
 	begin : GENERATE_SIGMA_DELTA
+		// {{{
 		reg	[PWM_BITS-1:0]	sigma_delta_i, sigma_delta_q;
 
 		//
@@ -288,10 +313,11 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 		else
 			o_rf_data <= { sigma_delta_i[PWM_BITS-1],
 					sigma_delta_q[PWM_BITS-1] };
-
+		// }}}
 	end else begin : GENERATE_PWM
 		//
 		// Convert to a PWM (PDM) signal
+		// {{{
 		//
 		integer	k;
 		reg	[PWM_BITS-1:0]	pwm_counter, brev_pwm;
@@ -333,12 +359,15 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 			o_rf_data[0] <= (sin_value_off <= brev_pwm);
 			o_rf_data[1] <= (cos_value_off <= brev_pwm);
 		end
-
+		// }}}
 	end endgenerate
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Debug signals
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	always @(posedge i_clk)
 	casez(i_dbg_sel)
@@ -359,10 +388,13 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 			cos_value[SIN_BITS-1:SIN_BITS-(HIST_BITS/2)],
 			sin_value[SIN_BITS-1:SIN_BITS-(HIST_BITS/2)] };
 	endcase
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Bus read interface
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	always @(*)
 		o_wb_stall = 1'b0;
@@ -394,12 +426,15 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 					{(32-PHASE_BITS){1'b0}} };
 		endcase
 	end
+	// }}}
 
 	// Make Verilator -Wall happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, i_wb_cyc, i_wb_sel, i_wb_data[31:16],
 			mic_ignore, mic_valid, cos_ignored, sin_ignored,
 			reset_filter };
 	// Verilator lint_on  UNUSED
+	// }}}
 endmodule
