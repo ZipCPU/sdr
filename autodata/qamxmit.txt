@@ -1,19 +1,17 @@
 ################################################################################
 ##
-## Filename:	auto-data/Makefile
+## Filename: 	qamxmit.txt
 ##
-## Project:	GDR, a basic Gateware Defined Radio architecture
+## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 ##
-## Purpose:	To coordinate the build of the glue logic holding this design
-##		together via autofpga.
-##
+## Purpose:	
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
 ##
-## Copyright (C) 2019-2020, Gisselquist Technology, LLC
+## Copyright (C) 2020, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as published
@@ -37,45 +35,10 @@
 ################################################################################
 ##
 ##
-.PHONY: all
-all:	data
-#
-# Could also depend upon load, if desired, but not necessary
-#
-# This is the list of components that will form our project.  Each file consists
-# of parts and pieces of our project that autofpga will copy/paste into our
-# main project files.
-#
-
-## Potential Transmitters
-#
-# RF := qamxmit.txt
-# RF := amxmit.txt
-# RF := fmxmit.txt
-# RF := qpskxmit.txt
-
-## Potential Receiver
-#
-# RF := amdemod.txt
-# RF := fmdemod.txt
-# RF := qpskrcvr.txt
-
-## Full transmit/receiver chain
-#
-# RF := wavsim.txt
-# RF := amsim.txt
-# RF := fmsim.txt
-RF := qpsksim.txt
-
-DEBUG := histogram.txt rfscope.txt samplerate.txt
-DATA := global.txt clock36.txt version.txt hexbus.txt gpio.txt $(RF) $(DEBUG)
-
-AUTOFPGA := autofpga
-.PHONY: data
-data: $(DATA)
-	$(AUTOFPGA) -d -o . $(DATA)
-
-clean:
-	rm -f toplevel.v main.v regdefs.h regdefs.cpp board.h board.ld
-	rm -f rtl.make.inc main_tb.cpp
-	rm -f autofpga.dbg
+@PREFIX=qamxmit
+@DEVID=TRANSMITTER
+@DEPENDS=RFSCOPE_ACCESS
+@XMITTER=qamxmit
+@INCLUDEFILE=transmitter.txt
+@RTL.MAKE.GROUP=XMIT
+@RTL.MAKE.FILES=subfildown.v qamxmit.v smpladc.v sfifo.v
