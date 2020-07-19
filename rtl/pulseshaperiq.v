@@ -264,13 +264,18 @@ module	pulseshaperiq
 	always @(posedge i_clk)
 	if (!running)
 	begin
-		tidx <= 0;
+		tidx <= (i_valid ? NUP : 0);
 		running <= i_valid;
 	end else begin // if (running)
 		tidx <= tidx + NUP;
 		if (last_coeff)
 		begin
-			tidx    <= (NUP-upcount);
+			// Verilator lint_off WIDTH
+			if (upcount == 0)
+				tidx <= 0;
+			else
+				tidx    <= (NUP-upcount);
+			// Verilator lint_on  WIDTH
 			running <= (upcount != 0);
 		end
 	end
@@ -279,9 +284,9 @@ module	pulseshaperiq
 	always @(posedge i_clk)
 	if (!running)
 		// Waiting here for the first sample to come through
-		didx <= wraddr + 1;
+		didx <= wraddr + 1 + (i_valid ? 1:0);
 	else if (last_coeff)
-		didx <= wraddr;
+		didx <= wraddr + ((upcount == 0) ? 1:0);
 	else
 		// Always read from oldest first, that way we can rewrite
 		// the data as new data comes in--since we've already used it.
@@ -321,7 +326,7 @@ module	pulseshaperiq
 		d_ce  <= 0;
 	end else begin
 		// d_ce is true when the first memory read of data is valid
-		d_ce  <= (tidx < NUP)&&(running);
+		d_ce  <= (tidx < NUP)&&(running || i_valid);
 		d_run <= (tidx >= NUP);
 		//
 		//
