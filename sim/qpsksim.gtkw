@@ -1,0 +1,52 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Sat Jul 18 21:53:33 2020
+[*]
+[timestart] 101464600000
+[size] 1920 1021
+[pos] -1 -1
+*-25.498001 5620100000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.main.
+[treeopen] TOP.main.qpskxmiti.
+[treeopen] TOP.main.qpskxmiti.resample_audio.
+[sst_width] 270
+[signals_width] 470
+[sst_expanded] 1
+[sst_vpaned_height] 290
+@28
+TOP.i_clk
+TOP.main.i_reset
+@200
+-
+@22
+TOP.main.qpskxmiti.mic_sample[11:0]
+@28
+TOP.main.qpskxmiti.audio_ce
+@22
+TOP.main.qpskxmiti.audio_sample[6:0]
+TOP.main.qpskxmiti.scrambled_sample[6:0]
+TOP.main.qpskxmiti.qpsk_sreg[5:0]
+@28
+TOP.main.qpskxmiti.qpsk_ce
+TOP.main.qpskxmiti.qpsk_symbol[1:0]
+@8420
+TOP.main.qpskxmiti.baseband_i[11:0]
+TOP.main.qpskxmiti.baseband_q[11:0]
+@22
+TOP.main.qpskxmiti.baseband_i[11:0]
+TOP.main.qpskxmiti.pulse_i[11:0]
+TOP.main.qpskxmiti.baseband_q[11:0]
+TOP.main.qpskxmiti.pulse_q[11:0]
+@201
+-
+@22
+TOP.main.qpskxmiti.resample_audio.cval[11:0]
+TOP.main.qpskxmiti.resample_audio.didx[10:0]
+TOP.main.qpskxmiti.resample_audio.tidx[10:0]
+@28
+TOP.main.qpskxmiti.resample_audio.i_ce
+TOP.main.qpskxmiti.resample_audio.p_ce
+TOP.main.qpskxmiti.resample_audio.p_run
+[pattern_trace] 1
+[pattern_trace] 0
