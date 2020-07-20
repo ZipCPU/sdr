@@ -42,33 +42,52 @@
 //
 `default_nettype none
 //
-module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
-	parameter	IW=16, OW=32, LGMEM=28, SHIFT=0, STAGES=4;
-	localparam	AVG_BITS=(LGMEM+STAGES-1)/STAGES;
-	input	wire			i_clk, i_reset;
+module	cicfil #(
+		// {{{
+		parameter	IW=16,	// Input bit-width
+				OW=32,  // Output bit width
+				// LGMEM is the number of bits used for internal
+				// accumulation.  It should be larger than
+				// $clog2(i_navg^STAGES)
+				LGMEM=28,
+				// SHIFT is what we use to recover from the
+				// gain.  It controls a final pass where we
+				// downshift by SHIFT before returning the
+				// result
+				SHIFT=0,
+				STAGES=4, // Number of stages of int & dump
+		localparam	AVG_BITS=(LGMEM+STAGES-1)/STAGES
+		// }}}
+	) (
+	// {{{
+	input	wire			i_clk, i_reset,
 	//
 	// Watch the gain here: the gain of STAGES CICs is i_navg ^ STAGES
 	// Easiest way to handle it is to set i_navg to 2^n, and STAGES to 2^m
 	// then the gain can be removed with a simple shift
-	input wire [AVG_BITS-1:0]	i_navg;
-	input	wire			i_ce;
-	input	wire	[(IW-1):0]	i_val;
-	output	reg			o_ce;
-	output	reg	[(OW-1):0]	o_val;
+	input wire [AVG_BITS-1:0]	i_navg,
+	input	wire			i_ce,
+	input	wire	[(IW-1):0]	i_val,
+	output	reg			o_ce,
+	output	reg	[(OW-1):0]	o_val
+	// }}}
+	);
 
+	// Declare signals and registers
+	// {{{
 	genvar	k;
-
 	reg	[(IW+LGMEM-1):0]	acc[0:STAGES];
 	reg	[AVG_BITS-1:0]		ctr;
 	// Decimation memory
 	reg	[(IW+LGMEM-1):0]	r_dmem[0:STAGES];
 	reg	[(IW+LGMEM-1):0]	dec[0:STAGES];
 	reg	[(IW+LGMEM-1):0]	pre_rounded_result;
+	// }}}
 
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Cascaded intgration section
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -98,11 +117,11 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 			acc[k] <= acc[k] + acc[k-1];
 
 	end endgenerate
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Calculate our decimated clock enable signal
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -126,11 +145,11 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 		end
 	end else
 		o_ce <= 1'b0;
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Cascaded dump section
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -168,17 +187,17 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 		end
 
 	end endgenerate
+	// }}}
 
-	//
 	// Rename the final answer
-	//
+	// {{{
 	always @(*)
 		pre_rounded_result = dec[STAGES];
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Report the result(s)
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -189,14 +208,15 @@ module	cicfil(i_clk, i_reset, i_navg, i_ce, i_val, o_ce, o_val);
 	else if (o_ce)
 		o_val <= pre_rounded_result[IW+LGMEM-SHIFT-1:IW+LGMEM-SHIFT-OW];
 
-	//
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 
-
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, i_navg[0], pre_rounded_result };
 	// Verilator lint_on  UNUSED
-
+	// }}}
 endmodule

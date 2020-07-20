@@ -53,7 +53,7 @@ module	amxmit #(
 		//
 		// Verilator lint_off REALCVT
 		localparam [31:0] MIC_STEP = 4.0 * (1<<30) * RAW_DATA_RATE_HZ
-					* 1.0 / CLOCK_FREQUENCY_HZ,
+					* 1.0 / CLOCK_FREQUENCY_HZ
 		// Verilator lint_on  REALCVT
 		//
 		//
