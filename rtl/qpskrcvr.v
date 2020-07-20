@@ -75,6 +75,8 @@ module	qpskrcvr #(
 	);
 	//
 
+	// Declarations
+	// {{{
 	localparam	PHASE_BITS=16;
 	localparam [PHASE_BITS-1:0] SYMBOL_STEP
 				= { 3'b001, {(PHASE_BITS-3){1'b0}} };
@@ -83,7 +85,8 @@ module	qpskrcvr #(
 	localparam	SOFT_BITS = 2*BB_BITS+2;
 	localparam	FC_BITS = 8;
 	localparam	PWM_BITS = 8;
-	localparam	NUM_DOWNSAMPLE_COEFFS = 31 * 4;
+	// Have only enough time for 68 clock cycles
+	localparam	NUM_DOWNSAMPLE_COEFFS = 63;
 	localparam	PULSE_SHAPE_FILTER = "pshape8x.hex";
 
 	reg	[2:0]			high_symbol_phase;
@@ -107,6 +110,7 @@ module	qpskrcvr #(
 	wire	[PHASE_BITS-1:0]	sym_phase;
 	reg	[2:0]			last_sym_phase, short_phase;
 	wire	[1:0]			sym_err;
+	// }}}
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -119,7 +123,7 @@ module	qpskrcvr #(
 		high_symbol_phase = 3'h0;
 
 	initial	load_pll     = 0;
-	initial	pll_lgcoeff  = 5'h2;
+	initial	pll_lgcoeff  = 5'h5;
 	initial	new_pll_step = { 3'h1, {(PHASE_BITS-3){1'b0}} };
 	always @(posedge i_clk)
 	if (i_wb_stb && i_wb_we && i_wb_addr == 2'b00)
@@ -154,14 +158,22 @@ module	qpskrcvr #(
 	//
 	// Come down from CLOCK_FREQUENCY_HZ down to 512ksps
 
+	//
+	// CIC gain = CIC_DOWN ^ 4 ~= 83,531
+	//	Want IW+LGMEM-OW-SHIFT = 23 - SHIFT = 0 for no gain
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4),
-		.LGMEM(28), .SHIFT(14)
-	) cici(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1, i_rf_data[1] ? 2'b01: 2'b11,
+		.LGMEM(28),
+		// Anything more than a shift of 12 will overflow on a solid
+		// 1 or -1 signa.
+		.SHIFT(12)
+	) cici(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1,
+			i_rf_data[1] ? 2'b11: 2'b01,
 			cic_ce, cic_sample_i);
 
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4),
-		.LGMEM(28), .SHIFT(14)
-	) cicq(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1, i_rf_data[0] ? 2'b01: 2'b11,
+		.LGMEM(28), .SHIFT(12)
+	) cicq(i_clk, 1'b0, CIC_DOWN[6:0], 1'b1,
+			i_rf_data[0] ? 2'b11: 2'b01,
 			cic_ign, cic_sample_q);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -173,7 +185,18 @@ module	qpskrcvr #(
 	// Need to come down to 8x per symbol, or 512ksps total
 	//
 
-	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(6),
+	// Our filter has a gain of nearly 2k/8 = 250
+	// The result of this filter will have 12+CIC_BITS+log_2(LGNCOEFFS)
+	// or 12+7+5+2 = 26 bits, before shifting.  If the input is full
+	// scale (7 bits), then the output will have 15 bits and we can shift
+	// out anything beyond that
+	//
+	// THE FILTER AS IT EXISTS ISN'T PROPERLY DEFINED.  IT WAS DEFINED AS
+	// SOMETHING THAT WAS *WAY* TOO LONG.  I'VE TRUNCATED IT TO GET IT TO
+	// FIT, AND THE RESULT IS POOR HIGH FREQUENCY RESPONSE AS ONE MIGHT
+	// EXPECT.
+	//
+	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
 		.INITIAL_COEFFS(PULSE_SHAPE_FILTER),
 		.NDOWN(RESAMPLE_DOWN),
 		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_DOWNSAMPLE_COEFFS)
@@ -194,6 +217,10 @@ module	qpskrcvr #(
 	reg	signed	[AMFIL_BITS-1:0]	filtered_detect, last_filtered;
 	reg	[3:0]	fchain_ce;
 
+	//
+	// THIS ALGORITHM NOW WORKS AND THE PLL LOCKS NICELY.  I MIGHT STILL
+	// SWAP IT FOR ANOTHER/BETTER IN THE FUTURE.
+	//
 
 	// Measure | demod_i^2  + demod_q^2 |
 	//
@@ -249,7 +276,7 @@ module	qpskrcvr #(
 	// Apply a PLL
 	sdpll	#(
 		.PHASE_BITS(PHASE_BITS),
-		.OPT_TRACK_FREQUENCY(1'b0),
+		.OPT_TRACK_FREQUENCY(1'b1),
 		.INITIAL_PHASE_STEP(SYMBOL_STEP)
 	) symbol_pll(i_clk, load_pll, new_pll_step[PHASE_BITS-2:0],
 		fchain_ce[3], amfil_sample, pll_lgcoeff, sym_phase, sym_err);
@@ -287,6 +314,12 @@ module	qpskrcvr #(
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
+	// THIS ISN'T YET WORKING.  IN HIND SIGHT, THIS ALGORITHM IS JUST
+	// COMPLETELY MESSED UP.  MULTIPLYING BY THE PAST SAMPLE???? THAT'D
+	// JUST AMPLIFY ANY NOISE.  ALSO NOT VERIFIED IS THE SYMBOL SELECTION
+	// FROM THE PRIOR STEP.  WHILE THE SYMBOL TRACKING IS WORKING QUITE
+	// WELL, IT'S NOT NEARLY AS CLEAR THAT THE CORRECT SYMBOL IS BEING
+	// SELECTED AS A RESULT OF THE TRACKING.
 	//
 	reg	signed	[BB_BITS-1:0]	past_symbol_i, past_symbol_q;
 	reg	[2:0]			mpy_count, past_mpy_count,
@@ -301,7 +334,7 @@ module	qpskrcvr #(
 	//		ci * pi + cq * pq
 	//		ci * pq - cq * pi
 
-	// demod_i = $past(demod_i,4)
+	// demod_i = $past(demod_i)
 	// demod_q
 	//
 
@@ -342,7 +375,7 @@ module	qpskrcvr #(
 
 	always @(posedge i_clk)
 	begin
-		past_mpy_count <= mpy_count;
+		past_mpy_count      <= mpy_count;
 		past_past_mpy_count <= past_mpy_count;
 	end
 
@@ -373,6 +406,12 @@ module	qpskrcvr #(
 		soft_dmd_q <= pre_soft_dmd_q - pre_soft_dmd_i;
 	end
 
+	// Constellation should now be:
+	//
+	//	01 | 00
+	//	-------
+	//	11 | 10
+	//
 	assign	dmd_i = !soft_dmd_i[SOFT_BITS-1];
 	assign	dmd_q = !soft_dmd_q[SOFT_BITS-1];
 
@@ -386,8 +425,8 @@ module	qpskrcvr #(
 	//
 
 	//
-	// We'll skip this step.  With the differential encoding we've chosen,
-	// this really isn't required.
+	// THIS NEEDS TO BE DONE
+	//
 	//
 
 	// }}}
@@ -436,10 +475,10 @@ module	qpskrcvr #(
 	if (symbol_ce)
 	begin
 		case(frame_match)
-		4'b0001: frame_pos <= 2'b00;
-		4'b0010: frame_pos <= 2'b01;
-		4'b0100: frame_pos <= 2'b10;
-		4'b1000: frame_pos <= 2'b11;
+		4'b0001: frame_pos <= 2'b11;
+		4'b0010: frame_pos <= 2'b00;
+		4'b0100: frame_pos <= 2'b01;
+		4'b1000: frame_pos <= 2'b10;
 		default: begin end ///  No lock, keep position
 		endcase
 	end
@@ -467,7 +506,7 @@ module	qpskrcvr #(
 	//
 	wire	[6:0]	audio_sample;
 
-	descrambler
+	descrambler #(.WS(7), .LN(31), .TAPS(31'h00_00_20_01))
 	recover(i_clk, 1'b0, frame_ce, scrambled_sample, audio_sample);
 
 	// }}}
