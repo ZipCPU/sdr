@@ -70,9 +70,11 @@ module	descrambler(i_clk, i_reset, i_ce, i_word, o_word);
 	always @(posedge i_clk)
 	if (i_ce)
 	begin
+		o_word[WS-1] <= i_word[WS-1] ^ (^(sreg & TAPS));
 		// High order bit is "first", so we need to reverse here
-		for(ik=0; ik<WS; ik=ik+1)
-			o_word[ik] <= i_word[WS-1-ik]^(^(step[WS-1-ik] & TAPS));
+		for(ik=1; ik<WS; ik=ik+1)
+			o_word[WS-1-ik] <= i_word[WS-1-ik]
+						^ (^(step[ik-1] & TAPS));
 	end
 
 	// Verilator lint_off UNUSED
