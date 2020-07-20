@@ -232,7 +232,7 @@ module	qpskxmit #(
 	//
 	wire	[6:0]	scrambled_sample;
 
-	scrambler #(.WS(7), .LN(31), .TAPS(31'h80_00_02_00))
+	scrambler #(.WS(7), .LN(31), .TAPS(31'h00_00_20_01))
 	randomizer(i_clk, i_reset, audio_ce, audio_sample, scrambled_sample);
 
 	// }}}
@@ -243,6 +243,7 @@ module	qpskxmit #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
 	always @(posedge i_clk)
 	if (audio_ce)
 	begin
@@ -305,7 +306,7 @@ module	qpskxmit #(
 	//
 	//
 	pulseshaperiq #(.NUP(4), .NCOEFFS(64),
-		.IW(2), .SHIFT(1), .OW(BB_BITS),
+		.IW(2), .SHIFT(7), .OW(BB_BITS), .CW(12),
 		.FIXED_COEFFS(1'b0),
 		.INITIAL_COEFFS(PULSE_SHAPE_FILTER)
 	) genpulseiq(i_clk, reset_pulse, write_pulse, write_coeff[15:4],
@@ -380,17 +381,20 @@ module	qpskxmit #(
 
 	always @(posedge i_clk)
 		sdi_integrator <= { 1'b0, sdi_integrator[PWM_BITS-2:0] }
-			+ { !baseband_i[BB_BITS-1], baseband_i,
-				{(PWM_BITS-BB_BITS-2){1'b0} }};
+			+ { 1'b0, !baseband_i[BB_BITS-1],
+				baseband_i[BB_BITS-2:0],
+				{(PWM_BITS-BB_BITS-1){1'b0} }};
 
 	always @(posedge i_clk)
 		sdq_integrator <= { 1'b0, sdq_integrator[PWM_BITS-2:0] }
-			+ { !baseband_q[BB_BITS-1], baseband_q,
-				{(PWM_BITS-BB_BITS-2){1'b0} }};
+			+ { 1'b0, !baseband_q[BB_BITS-1],
+				baseband_q[BB_BITS-2:0],
+				{(PWM_BITS-BB_BITS-1){1'b0} }};
 
 	always @(posedge i_clk)
 	if (i_rf_en)
-		o_rf_data <= { sdi_integrator[15], sdq_integrator[15] };
+		o_rf_data <= { sdi_integrator[PWM_BITS-1],
+				sdq_integrator[PWM_BITS-1] };
 	else
 		o_rf_data <= ~o_rf_data;
 
