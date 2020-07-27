@@ -14,24 +14,30 @@ You can see [a picture of this setup here](doc/radio-set.jpg).
 
 ## Building the design
 
-This repository actually contains several designs.  Only one of them at present
-even (partially) works.  There's an AM transmitter, an FM transmitter, an AM
-receiver, and an FM receiver.  Which design gets built into the repository
-is controlled by which line "RF" line in the [AutoFPGA
+This repository actually contains several designs.  There's an
+[AM transmitter](rtl/amxmit.v),
+an [FM transmitter](rtl/fmxmit.v),
+a [QPSK transmitter](rtl/qpskxmit.v),
+an [AM receiver](rtl/amdemod.v), an
+[FM receiver](rtl/fmdemod.v), and a
+[QPSK receiver](rtl/qpskrcvr.v).  There are also three composed  designs, which
+compose the transmitter and receiver together for simulation (only) purposes.
+Which design gets built into the repository
+is controlled by which "RF" line in the [AutoFPGA
 Makefile](autodata/Makefile) is uncommented.
 
-To build, you'll first need [AutoFPGA (dev
-branch)](https://github.com/ZipCPU/autofpga) installed and in your path.
-You can then run `make autodata` to build the top level design, PCF, simulation,
-and software data files.  From here, `make rtl` will build the design,
-`make sim` will build the simulator, and `make sw` will build the host support
-software.
+To build, you'll first need [AutoFPGA](https://github.com/ZipCPU/autofpga)
+installed and in your path.  You can then run `make autodata` to build the
+[top level design](rtl/toplevel.v), [PCF](rtl/sdr.pcf),
+[simulation](sim/main_tb.cpp), and [software data files](sw/regdefs.h).  From
+here, `make rtl` will build the design, `make sim` will build the simulator,
+and `make sw` will build the host support software.
 
 Beware, if you use any of the composed simulations, such as the AM transmitter
-followed by the AM demodulator, you will run into a problem where the microphone
-and the amplifier are both attempting to use the same pins.  The solution
-is not to build the composed (transmit/receive) design in rtl.  Instead,
-run `make rtl-sim` to build the full simulation.
+followed by the AM demodulator, you will run into a problem where the
+microphone and the amplifier are both attempting to use the same pins.  The
+solution is not to build the composed (transmit/receive) design in rtl.
+Instead, run `make rtl-sim` to build the full simulation.
 
 ## Running in Simulation
 
@@ -41,7 +47,7 @@ directory.  This isn't very useful at present, however, unless you add the
 traces from within the design.
 
 Be aware, the simulation has no channel model.  Outputs to the
-SX1257
+[SX1257](https://github.com/xil-se/SX1257-PMOD)
 are simply fed back into the simulation receiver.
 
 ## Running on hardware
@@ -50,7 +56,8 @@ To run the design on an icebreaker, you can load the design via
 `sudo iceprog rtl/sdr.bin`.  Once you do that, you'll want to then run
 `sw/netuart /dev/ttyUSB?` (replace with your serial port device).  At this
 point, you can interact with your design using `wbregs`.  Perhaps more
-importantly, you can interact with the registers on the SX1257
+importantly, you can interact with the registers on the
+[SX1257](https://github.com/xil-se/SX1257-PMOD)
 using the `rfregs`.  In particular, `txconfig.sh` will turn the transmitter
 on, and set it up at 915MHz.
 
@@ -72,10 +79,13 @@ it into a VCD file you can then analyze with GTKWave.
 Alternatively, you can capture histograms from within the design.  These
 can be read with the [histogram](sw/histogram.cpp) program.  This program will
 also output a binary file of 32-bit integers containing your histogram.
-(The histogram is currently hardcoded at 1024 words, due to hardware limitations
+(The
+[histogram](https://zipcpu.com/dsp/2019/12/21/histogram.html)
+is currently hardcoded at 1024 words, due to hardware limitations
 in the iCE40 up5k.)
 
-With a little creativity, the histogram capture utility can be turned into
+With a little creativity, the [histogram capture
+utility](https://zipcpu.com/dsp/2019/12/21/histogram.html) can be turned into
 a constellation capture utility.  By sending 5-bits of I and 5-bits of Q
 into the histogram, and then interpreting the results accordingly, you can
 capture (and then plot) a constellation diagram.  This is the purpose of
@@ -92,6 +102,13 @@ As of 20200204, ...
 3. The AM transmitter works, and the results can be heard using a Lime
 	SDR radio receiver.  There's an annoying tone present which I haven't
 	yet chased down.
+
+As of 20200727, there's now a [QPSK transmitter](rtl/qpskxmit.v) and
+[receiver](rtl/qpskrcvr.v) which both (roughly) work in simulation.  I say
+roughly because the carrier tracking loop breaks lock even in simulation.
+Further, the filters used in these designs are horrible block average types
+of filters.  Hence, while the design can recover the incoming audio, there's
+still lots of room for improvement.
 
 ## License
 

@@ -54,8 +54,10 @@ endif
 export	$(VERILATOR)
 VROOT   := $(VERILATOR_ROOT)
 VDEFS   := $(shell ./vversion.sh)
-GFXFLAGS:= `pkg-config gtkmm-3.0 --cflags`
-GFXLIBS := `pkg-config gtkmm-3.0 --cflags --libs`
+SIGLIBD := $(HOME)/src/siglib
+SIGDPYD := $(HOME)/src/sigdisplay
+GFXFLAGS:= -I $(SIGLIBD) -I $(SIGDPYD) `pkg-config gtkmm-3.0 --cflags`
+GFXLIBS := $(SIGDPYD)/sigdpy.a $(SIGLIBD)/siglib.a `pkg-config gtkmm-3.0 --cflags --libs`
 FLAGS	:= -Wall -Og -g $(VDEFS)
 VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
@@ -68,7 +70,7 @@ HEADERS := ../sw/port.h testb.h uartsim.h micnco.h
 VOBJDR	:= $(RTLD)/obj_dir
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 VMAIN	:= $(VOBJDR)/Vmain__ALL.a
-SIMSRCS := uartsim.cpp micnco.cpp
+SIMSRCS := uartsim.cpp micnco.cpp twoc.cpp
 SIMOBJ := $(subst .cpp,.o,$(SIMSRCS))
 SIMOBJS:= $(addprefix $(OBJDIR)/,$(SIMOBJ))
 #
@@ -96,10 +98,17 @@ amdemod.hex: $(RTLD)/amdemod.hex
 #
 $(OBJDIR)/main_tb.o: automaster_tb.cpp
 	$(mk-objdir)
+	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
+
+$(OBJDIR)/gfx_tb.o: gfx_tb.cpp
+	$(mk-objdir)
 	$(CXX) $(FLAGS) $(GFXFLAGS) $(INCS) -c $< -o $@
 
 
 main_tb: $(OBJDIR)/main_tb.o $(SIMOBJS) $(VMAIN) $(VOBJS)
+	$(CXX) $(FLAGS) $(INCS) $^ -lelf -o $@
+
+gfx_tb: $(OBJDIR)/gfx_tb.o $(SIMOBJS) $(VMAIN) $(VOBJS)
 	$(CXX) $(FLAGS) $(GFXFLAGS) $(INCS) $^ $(GFXLIBS) -lelf -o $@
 
 #

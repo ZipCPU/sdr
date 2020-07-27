@@ -164,6 +164,8 @@ module	pulseshaperiq
 	//
 	reg	signed [IW+CW-1:0]	product_i, product_q;
 	//
+	wire			sign_i, overflow_i,
+				sign_q, overflow_q;
 	reg	[AW-1:0]	accumulator_i, accumulator_q;
 	//
 	wire	[AW-1:0]	rounded_result_i, rounded_result_q;
@@ -425,6 +427,12 @@ module	pulseshaperiq
 	begin : NO_SHIFT
 		assign	rounded_result_i= accumulator_i[AW-SHIFT-1:AW-SHIFT-OW];
 		assign	rounded_result_q= accumulator_q[AW-SHIFT-1:AW-SHIFT-OW];
+
+		assign	sign_i = accumulator_i[AW-1];
+		assign	sign_q = accumulator_q[AW-1];
+
+		assign	overflow_i=accumulator_i[AW-1]!= rounded_result_i[AW-1];
+		assign	overflow_q=accumulator_q[AW-1]!= rounded_result_q[AW-1];
 	end else if (AW-SHIFT > OW)
 	begin : SHIFT_OUTPUT
 		wire	[AW-1:0]	prerounded_i;
@@ -441,6 +449,14 @@ module	pulseshaperiq
 		assign	rounded_result_q = (&prerounded_i[AW-1:AW-OW]) ? -1
 			: prerounded_q + { {(OW){1'b0}}, prerounded_q[AW-OW-1],
 					{(AW-OW-1){!prerounded_q[AW-OW-1]}} };
+
+		assign	sign_i = accumulator_i[AW-1];
+		assign	sign_q = accumulator_q[AW-1];
+
+		assign	overflow_i= (sign_i && !accumulator_i[AW-1])
+				|| (!sign_i && rounded_result_i[AW-1]);
+		assign	overflow_q= (sign_q && !accumulator_q[AW-1])
+				|| (!sign_q && rounded_result_q[AW-1]);
 	end else begin : UNIMPLEMENTED_SHIFT
 	end endgenerate
 
@@ -449,8 +465,17 @@ module	pulseshaperiq
 	if (p_ce)
 	begin
 		o_ce <= 1;
-		o_result_i <= rounded_result_i[AW-1:AW-OW];
-		o_result_q <= rounded_result_q[AW-1:AW-OW];
+		if (overflow_i)
+			o_result_i <= (sign_i) ? { 1'b1, {(OW-1){1'b0}} }
+					: { 1'b0, {(OW-1){1'b1}} };
+		else
+			o_result_i <= rounded_result_i[AW-1:AW-OW];
+
+		if (overflow_q)
+			o_result_q <= (sign_q) ? { 1'b1, {(OW-1){1'b0}} }
+					: { 1'b0, {(OW-1){1'b1}} };
+		else
+			o_result_q <= rounded_result_q[AW-1:AW-OW];
 	end else
 		o_ce <= 1'b0;
 

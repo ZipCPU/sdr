@@ -82,8 +82,8 @@ module	qpskrcvr #(
 				= { 3'b001, {(PHASE_BITS-3){1'b0}} };
 	localparam	HIST_BITS=10;
 	localparam	BB_BITS=7;
-	localparam	SOFT_BITS = 2*BB_BITS+2;
-	localparam	FC_BITS = 8;
+	localparam	SOFT_BITS = 8;
+	localparam	FC_BITS = 6;
 	localparam	PWM_BITS = 8;
 	// Have only enough time for 68 clock cycles
 	localparam	NUM_DOWNSAMPLE_COEFFS = 63;
@@ -121,6 +121,8 @@ module	qpskrcvr #(
 	//
 	always @(*)
 		high_symbol_phase = 3'h0;
+// 16,999,524
+// 60,442,752 / 4 = 15,110,688
 
 	initial	load_pll     = 0;
 	initial	pll_lgcoeff  = 5'h5;
@@ -196,7 +198,12 @@ module	qpskrcvr #(
 	// FIT, AND THE RESULT IS POOR HIGH FREQUENCY RESPONSE AS ONE MIGHT
 	// EXPECT.
 	//
-	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(10),
+	//
+	// I've (temporarily) replaced the filter with a block averaging
+	// filter.  This filter has the properties I need in order to lock.
+	//
+	//
+	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(5),
 		.INITIAL_COEFFS(PULSE_SHAPE_FILTER),
 		.NDOWN(RESAMPLE_DOWN),
 		.FIXED_COEFFS(1'b0), .NCOEFFS(NUM_DOWNSAMPLE_COEFFS)
@@ -213,14 +220,6 @@ module	qpskrcvr #(
 	//
 	//
 	localparam	AMFIL_BITS = 2*BB_BITS+4;
-	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:3];
-	reg	signed	[AMFIL_BITS-1:0]	filtered_detect, last_filtered;
-	reg	[3:0]	fchain_ce;
-
-	//
-	// THIS ALGORITHM NOW WORKS AND THE PLL LOCKS NICELY.  I MIGHT STILL
-	// SWAP IT FOR ANOTHER/BETTER IN THE FUTURE.
-	//
 
 	// Measure | demod_i^2  + demod_q^2 |
 	//
@@ -245,6 +244,17 @@ module	qpskrcvr #(
 	if (fchain_ce[0])
 		am_detect <= baseband_i_squared + baseband_q_squared;
 
+// `define	OLD_ALGORITHM
+`ifdef	OLD_ALGORITHM
+	//
+	// This only *sort* of works.  It doesn't really work that well.  In
+	// particular, it struggles to coast through large periods w/o
+	// transitions.  There's no easy way to fix this algorithm, so the
+	// separate algorithm below (other side of the if-def) works better.
+	//
+	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:3];
+	reg	signed	[AMFIL_BITS-1:0]	filtered_detect, last_filtered;
+	reg	[3:0]	fchain_ce;
 	//
 	// Generate a filtered_detect signal
 	//
@@ -273,6 +283,33 @@ module	qpskrcvr #(
 
 	assign	amfil_sample = filtered_detect[AMFIL_BITS-1];
 
+`else	// OLD_ALGORITHM
+	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:4];
+	reg	signed	[AMFIL_BITS-1:0]	filtered_detect;
+	reg	[3:0]	fchain_ce;
+	wire	[BB_BITS*2:0]	cyclic_result;
+
+	cycliciir #(.IW(BB_BITS*2+1), .OW(BB_BITS*2+1), .LGALPHA(6),
+			.NCYCLE(8)
+	) symavg (.i_clk(i_clk), .i_reset(i_reset), .i_ce(fchain_ce[1]),
+		.i_data(am_detect), .o_data(cyclic_result));
+
+	always @(posedge i_clk)
+	if (baseband_ce)
+	begin
+		am_sum[0] <= { {(AMFIL_BITS-(BB_BITS*2+1)){
+				cyclic_result[BB_BITS*2]} }, cyclic_result };
+		am_sum[1] <= am_sum[0];
+		am_sum[2] <= am_sum[1];
+		am_sum[3] <= am_sum[2];
+		am_sum[4] <= am_sum[3];
+		filtered_detect <= am_sum[0] - am_sum[4];
+	end
+
+	assign	amfil_sample = filtered_detect[AMFIL_BITS-1];
+`endif	// OLD_ALGORITHM
+
+
 	// Apply a PLL
 	sdpll	#(
 		.PHASE_BITS(PHASE_BITS),
@@ -300,120 +337,14 @@ module	qpskrcvr #(
 		// Be careful not to repeat our sample
 		if (last_sym_phase == high_symbol_phase)
 			symbol_ce <= 1'b0;
+		if (last_sym_phase == short_phase)
+			symbol_ce <= 1'b0;
 	end else
 		symbol_ce <= 1'b0;
 
 	always @(posedge i_clk)
 	if (symbol_ce)
 		{ symbol_i, symbol_q } <= { baseband_i, baseband_q };
-
-	// }}}
-	////////////////////////////////////////////////////////////////////////
-	//
-	// FM Demod to get baseband symbols
-	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	// THIS ISN'T YET WORKING.  IN HIND SIGHT, THIS ALGORITHM IS JUST
-	// COMPLETELY MESSED UP.  MULTIPLYING BY THE PAST SAMPLE???? THAT'D
-	// JUST AMPLIFY ANY NOISE.  ALSO NOT VERIFIED IS THE SYMBOL SELECTION
-	// FROM THE PRIOR STEP.  WHILE THE SYMBOL TRACKING IS WORKING QUITE
-	// WELL, IT'S NOT NEARLY AS CLEAR THAT THE CORRECT SYMBOL IS BEING
-	// SELECTED AS A RESULT OF THE TRACKING.
-	//
-	reg	signed	[BB_BITS-1:0]	past_symbol_i, past_symbol_q;
-	reg	[2:0]			mpy_count, past_mpy_count,
-					past_past_mpy_count;
-	reg	signed	[BB_BITS-1:0]	dmd_multiplicand_a, dmd_multiplicand_b;
-	reg	signed	[2*BB_BITS-1:0]	dmd_multiply_out;
-	reg	signed	[2*BB_BITS:0]	pre_soft_dmd_i, pre_soft_dmd_q;
-	reg	signed	[SOFT_BITS-1:0]	soft_dmd_i, soft_dmd_q;
-	wire				dmd_i, dmd_q;
-
-	// demod = current * conj($past(current,4))
-	//		ci * pi + cq * pq
-	//		ci * pq - cq * pi
-
-	// demod_i = $past(demod_i)
-	// demod_q
-	//
-
-	always @(posedge i_clk)
-	if (symbol_ce)
-		{ past_symbol_i, past_symbol_q } <= { symbol_i, symbol_q };
-
-	//
-	// We'll multiplex our multiply across several clock cycles, so that we
-	// can get by with only using one.  Since we're *WAY* oversampled (by
-	// about 70x or more), no one will notice our multiplexed multiply here.
-	//
-	always @(posedge i_clk)
-	if (symbol_ce)
-		mpy_count <= 3'h4;
-	else if (mpy_count > 0)
-		mpy_count <= mpy_count - 1;
-
-	always @(posedge i_clk)
-	case(mpy_count[1:0])
-	2'b00: begin
-		dmd_multiplicand_a <=        symbol_i;
-		dmd_multiplicand_b <=   past_symbol_i;
-		end
-	2'b11: begin
-		dmd_multiplicand_a <=        symbol_q;
-		dmd_multiplicand_b <=   past_symbol_q;
-		end
-	2'b10: begin
-		dmd_multiplicand_a <=        symbol_i;
-		dmd_multiplicand_b <=   past_symbol_q;
-		end
-	2'b01: begin
-		dmd_multiplicand_a <=        symbol_q;
-		dmd_multiplicand_b <= - past_symbol_i;
-		end
-	endcase
-
-	always @(posedge i_clk)
-	begin
-		past_mpy_count      <= mpy_count;
-		past_past_mpy_count <= past_mpy_count;
-	end
-
-	always @(posedge i_clk)
-	if (past_mpy_count > 0)
-		dmd_multiply_out <= dmd_multiplicand_a * dmd_multiplicand_b;
-
-	always @(posedge i_clk)
-	case(past_past_mpy_count)
-	// Verilator lint_off WIDTH
-	3'b100: pre_soft_dmd_i <= dmd_multiply_out;
-	3'b011: pre_soft_dmd_i <= pre_soft_dmd_i + dmd_multiply_out;
-	3'b010: pre_soft_dmd_q <= dmd_multiply_out;
-	3'b001: pre_soft_dmd_q <= pre_soft_dmd_q + dmd_multiply_out;
-	// Verilator lint_on  WIDTH
-	default: begin end
-	endcase
-
-	//
-	// Apply an extra +45 degree rotation, so we're no longer centered on
-	// the various axes.  This will also make it possible for us to just
-	// strip off the top bit and call it our demodulated bit.
-	//
-	always @(posedge i_clk)
-	if (symbol_ce)
-	begin
-		soft_dmd_i <= pre_soft_dmd_q + pre_soft_dmd_i;
-		soft_dmd_q <= pre_soft_dmd_q - pre_soft_dmd_i;
-	end
-
-	// Constellation should now be:
-	//
-	//	01 | 00
-	//	-------
-	//	11 | 10
-	//
-	assign	dmd_i = !soft_dmd_i[SOFT_BITS-1];
-	assign	dmd_q = !soft_dmd_q[SOFT_BITS-1];
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -425,9 +356,136 @@ module	qpskrcvr #(
 	//
 
 	//
-	// THIS NEEDS TO BE DONE
+	// Working!  (In simulation)
+	//
+
+	reg				symbol_pipe, too_much_carrier;
+	wire				rmc_busy, rmc_done;
+	reg	[15:0]			carrier_phase, carrier_step,
+					carrier_perr, carrier_ferr;
+	reg	signed	[SOFT_BITS-1:0]		cons_i, cons_q;
+`ifdef	VERILATOR
+	// Verilator lint_off UNUSED
+	(* keep *) reg			carrier_out_of_bounds;
+	// Verilator lint_on  UNUSED
+`endif
+
+	// Don't really need an 11 stage CORDIC here, but it's what's built
+	// for other parts of the project, so let's just reuse it.
+	seqcordic
+	remove_carrier(i_clk, i_reset,
+			symbol_ce, { symbol_i[BB_BITS-1], symbol_i },
+				{ symbol_q[BB_BITS-1], symbol_q },
+			carrier_phase,
+			rmc_busy, rmc_done, cons_i, cons_q);
+
+
+	// Measure the phase to the nearest quadrant
+	always @(posedge  i_clk)
+	if (rmc_done)
+	begin
+		case ({cons_i[BB_BITS-1], cons_q[BB_BITS-1]})
+		2'b00: too_much_carrier <= ( cons_i <  cons_q);
+		2'b10: too_much_carrier <= (-cons_i >  cons_q);
+		2'b11: too_much_carrier <= (-cons_i < -cons_q);
+		2'b01: too_much_carrier <= ( cons_i > -cons_q);
+		endcase
+`ifdef	VERILATOR
+		carrier_out_of_bounds <= 1'b0;
+		case ({cons_i[BB_BITS-1], cons_q[BB_BITS-1]})
+		2'b00: if (cons_i < cons_q/2)
+				carrier_out_of_bounds <= 1'b1;
+			else if (cons_i/2 > cons_q)
+				carrier_out_of_bounds <= 1'b1;
+		2'b10: if (-cons_i/2 < cons_q)
+				carrier_out_of_bounds <= 1'b1;
+			else if (-cons_i < cons_q/2)
+				carrier_out_of_bounds <= 1'b1;
+		2'b11: if (-cons_i < -cons_q/2)
+				carrier_out_of_bounds <= 1'b1;
+			else if (-cons_i/2 > -cons_q)
+				carrier_out_of_bounds <= 1'b1;
+		2'b01: if (cons_i/2 > -cons_q)
+				carrier_out_of_bounds <= 1'b1;
+			else if (cons_i < -cons_q/2)
+				carrier_out_of_bounds <= 1'b1;
+		endcase
+`endif
+	end
+
+	always @(posedge i_clk)
+		symbol_pipe <= rmc_done;
+
+	always @(*)
+		carrier_perr = 16'h0100;
+
+	// formula = perr ^2 / 4	(in radians)
+	//     = ( (2*pi*carrier_perr/2^16)^2 / 4 ) * (2^16 / 2/pi) = 1.5
+	always @(*)
+		carrier_ferr = 16'h01;
+
+	initial begin
+		// Apply some initial stress to the loop--just to prove
+		// we can handle it and recover
+		carrier_phase = 0;
+		carrier_step  = 15;
+	end
+	always @(posedge i_clk)
+	if (symbol_pipe)
+	begin
+		if (too_much_carrier)
+		begin
+			carrier_phase <= carrier_phase - carrier_perr
+					- carrier_step;
+			carrier_step <= carrier_step + carrier_ferr;
+		end else begin
+			carrier_phase <= carrier_phase + carrier_perr
+					- carrier_step;
+			carrier_step <= carrier_step - carrier_ferr;
+		end
+	end
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// FM Demod to get baseband symbols
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	reg	[1:0]	qpsk_bits;
+	reg		last_cons_i, last_cons_q;
+
+	always @(posedge i_clk)
+	if (symbol_ce)
+	begin
+		last_cons_i <= cons_i[SOFT_BITS-1];
+		last_cons_q <= cons_q[SOFT_BITS-1];
+
+		case({ cons_i[SOFT_BITS-1], cons_q[SOFT_BITS-1],
+			last_cons_i, last_cons_q })
+		// No rotation: Demod == 2'b00
+		4'b0000: qpsk_bits <= 2'b00;
+		4'b0101: qpsk_bits <= 2'b00;
+		4'b1111: qpsk_bits <= 2'b00;
+		4'b1010: qpsk_bits <= 2'b00;
+		// 180 rotation: Demod == 2'b11
+		4'b0011: qpsk_bits <= 2'b11;
+		4'b0110: qpsk_bits <= 2'b11;
+		4'b1100: qpsk_bits <= 2'b11;
+		4'b1001: qpsk_bits <= 2'b11;
+		// 90 degree clockwise: Demod = 2'b01
+		4'b0100: qpsk_bits <= 2'b01;
+		4'b1101: qpsk_bits <= 2'b01;
+		4'b1011: qpsk_bits <= 2'b01;
+		4'b0010: qpsk_bits <= 2'b01;
+		// 90 degree counter-clockwise: Demod = 2'b10
+		4'b0001: qpsk_bits <= 2'b10;
+		4'b0111: qpsk_bits <= 2'b10;
+		4'b1110: qpsk_bits <= 2'b10;
+		4'b1000: qpsk_bits <= 2'b10;
+		endcase
+	end
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -457,7 +515,7 @@ module	qpskrcvr #(
 		always @(posedge i_clk)
 		if (symbol_ce && frame_count == gk)
 		begin
-			if (dmd_i != dmd_q)
+			if (qpsk_bits[1] != qpsk_bits[0])
 			begin
 				if (&frame_check[gk])
 					frame_match[gk] <= 1'b1;
@@ -471,14 +529,15 @@ module	qpskrcvr #(
 		end
 	end endgenerate
 
+	initial	frame_pos = 2'b11;
 	always @(posedge i_clk)
 	if (symbol_ce)
 	begin
 		case(frame_match)
-		4'b0001: frame_pos <= 2'b11;
-		4'b0010: frame_pos <= 2'b00;
-		4'b0100: frame_pos <= 2'b01;
-		4'b1000: frame_pos <= 2'b10;
+		4'b0001: frame_pos <= 2'b00;
+		4'b0010: frame_pos <= 2'b01;
+		4'b0100: frame_pos <= 2'b10;
+		4'b1000: frame_pos <= 2'b11;
 		default: begin end ///  No lock, keep position
 		endcase
 	end
@@ -486,7 +545,7 @@ module	qpskrcvr #(
 
 	always @(posedge i_clk)
 	if (symbol_ce)
-		frame_sreg <= { frame_sreg[5:0], dmd_i, dmd_q };
+		frame_sreg <= { frame_sreg[5:0], qpsk_bits };
 
 	always @(posedge i_clk)
 	if (symbol_ce && frame_pos == frame_count)
@@ -551,22 +610,22 @@ module	qpskrcvr #(
 			{(16-BB_BITS){baseband_q[BB_BITS-1]}}, baseband_q,
 			baseband_i[BB_BITS-1:BB_BITS-HIST_BITS/2],
 			baseband_q[BB_BITS-1:BB_BITS-HIST_BITS/2] };
-	2'b01: // Symbols pre-FM
+	2'b01: // Symbols pre-carrier removal
 		{ o_dbg_ce, o_dbg_data, o_dbg_hist } <= {
 			symbol_ce,
 			{(16-BB_BITS){baseband_i[BB_BITS-1]}}, baseband_i,
 			{(16-BB_BITS){baseband_q[BB_BITS-1]}}, baseband_q,
 			baseband_i[BB_BITS-1:BB_BITS-HIST_BITS/2],
 			baseband_q[BB_BITS-1:BB_BITS-HIST_BITS/2] };
-	2'b10: // Symbols post-FM
+	2'b10: // Symbols post-carrier removal
 		{ o_dbg_ce, o_dbg_data, o_dbg_hist } <= {
 			symbol_ce,
-			{(16-BB_BITS){soft_dmd_i[SOFT_BITS-1] }},
-				soft_dmd_i[SOFT_BITS-1:SOFT_BITS-BB_BITS],
-			{(16-BB_BITS){soft_dmd_q[SOFT_BITS-1] }},
-				soft_dmd_q[SOFT_BITS-1:SOFT_BITS-BB_BITS],
-			soft_dmd_i[SOFT_BITS-1:SOFT_BITS-HIST_BITS/2],
-			soft_dmd_q[SOFT_BITS-1:SOFT_BITS-HIST_BITS/2] };
+			{(16-BB_BITS){cons_i[SOFT_BITS-1] }},
+				cons_i[SOFT_BITS-1:SOFT_BITS-BB_BITS],
+			{(16-BB_BITS){cons_q[SOFT_BITS-1] }},
+				cons_q[SOFT_BITS-1:SOFT_BITS-BB_BITS],
+			cons_i[SOFT_BITS-1:SOFT_BITS-HIST_BITS/2],
+			cons_q[SOFT_BITS-1:SOFT_BITS-HIST_BITS/2] };
 			// [2*BB_BITS+1:0]
 	2'b11: // Frame detect and sample output
 		{ o_dbg_ce, o_dbg_data, o_dbg_hist } <= { frame_ce,
@@ -612,6 +671,9 @@ module	qpskrcvr #(
 	assign	unused = &{ 1'b0, i_wb_cyc, i_rf_en, cic_ign, new_pll_step[15],
 			i_wb_data[30:16], i_wb_sel[3:2],
 			write_coeff[3:0], sym_phase[PHASE_BITS-4:0], sym_err,
+			rmc_busy, rmc_done,
+		// Unused pulse shaping filter signals
+		reset_downsampler, write_downsampler, write_coeff,
 			frame_sreg[7] };
 	// Verilator lint_on  UNUSED
 	// }}}

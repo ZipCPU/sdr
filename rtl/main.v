@@ -129,7 +129,6 @@ module	main(i_clk, i_reset,
 	// These declarations come from the @MAIN.DEFNS keys found in the
 	// various components comprising the design.
 	//
-// Looking for string: MAIN.DEFNS
 	reg	[$clog2(36000000)-1:0]
 			r_samplerate_counter, r_samplerate_counts;
 	reg	[31:0]	r_samplerate_result;
@@ -288,6 +287,7 @@ module	main(i_clk, i_reset,
 	2'h1: r_wb_sio_data <= wb_gpio_idata;
 	2'h2: r_wb_sio_data <= wb_samplerate_idata;
 	2'h3: r_wb_sio_data <= wb_version_idata;
+	// No default: SIZE = 4, [Guru meditation: 2 != 2]
 	endcase
 	assign	wb_sio_idata = r_wb_sio_data;
 
@@ -335,12 +335,18 @@ module	main(i_clk, i_reset,
 	wbxbar #(
 		.NM(1), .NS(4), .AW(11), .DW(32),
 		.SLAVE_ADDR({
+			// Address width    = 11
+			// Address LSBs     = 2
+			// Slave name width = 7
 			{ 11'h400 }, //    hist: 0x1000
 			{ 11'h300 }, //  wb_sio: 0x0c00
 			{ 11'h200 }, //    amtx: 0x0800
 			{ 11'h100 }  // rfscope: 0x0400
 		}),
 		.SLAVE_MASK({
+			// Address width    = 11
+			// Address LSBs     = 2
+			// Slave name width = 7
 			{ 11'h400 }, //    hist
 			{ 11'h700 }, //  wb_sio
 			{ 11'h700 }, //    amtx

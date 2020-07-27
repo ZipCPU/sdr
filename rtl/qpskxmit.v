@@ -118,7 +118,7 @@ module	qpskxmit #(
 	// localparam	XMIT_AUDIO_BITS= 12;
 	localparam	LGFLEN = 3;
 	localparam	LGFIFO = 4;
-	localparam	CLOCKS_PER_BB_SAMPLE = 17 * 4 * 4;
+	localparam	CLOCKS_PER_BB_SAMPLE = 17 * 8;
 			// = (CLOCK_FREQUENCY_HZ / BASEBAND_SAMPLE_RATE_HZ);
 	localparam	PULSE_SHAPE_FILTER = "pshape4x.hex";
 	localparam	AUDIO_FILTER = "audio8k.hex";
@@ -216,7 +216,7 @@ module	qpskxmit #(
 	//
 	//
 	subfildown #(.IW(MIC_BITS), .OW(AUDIO_BITS), .CW(12),
-		.SHIFT(4),
+		.SHIFT(7),
 		.NDOWN(RAW_AUDIO_DOWNSAMPLE_RATIO),
 		.FIXED_COEFFS(1'b0),
 		.NCOEFFS(NUM_AUDIO_COEFFS),
@@ -230,11 +230,26 @@ module	qpskxmit #(
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	wire	[6:0]	scrambled_sample;
+	wire	[6:0]	w_scrambled_sample;
+	reg	[6:0]	scrambled_sample;
+//	reg	[2:0]	r_scrambled_skip_count;
+//	reg		r_scrambled_skip;
 
 	scrambler #(.WS(7), .LN(31), .TAPS(31'h00_00_20_01))
-	randomizer(i_clk, i_reset, audio_ce, audio_sample, scrambled_sample);
+	randomizer(i_clk, i_reset, audio_ce, audio_sample, w_scrambled_sample);
 
+//	always @(posedge i_clk)
+////	if (audio_ce)
+//	begin
+//		r_scrambled_skip_count <= r_scrambled_skip_count + 1;
+//		r_scrambled_skip <= (r_scrambled_skip_count  == 0);
+//	end
+
+	always @(*)
+//	if (r_scrambled_skip)
+//		scrambled_sample = 0;
+//	else
+		scrambled_sample = w_scrambled_sample;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -286,15 +301,15 @@ module	qpskxmit #(
 		// Rotate 90 degrees clockwise
 		4'b0001: qpsk_symbol <= 2'b01;
 		4'b0101: qpsk_symbol <= 2'b11;
-		4'b1001: qpsk_symbol <= 2'b10;
-		4'b1101: qpsk_symbol <= 2'b00;
+		4'b1101: qpsk_symbol <= 2'b10;
+		4'b1001: qpsk_symbol <= 2'b00;
 		// Rotate 180 degrees clockwise
 		4'b??11: qpsk_symbol <= ~qpsk_symbol;
 		// Rotate 270 degrees clockwise
 		4'b0010: qpsk_symbol <= 2'b10;
 		4'b0110: qpsk_symbol <= 2'b00;
-		4'b1010: qpsk_symbol <= 2'b01;
-		4'b1110: qpsk_symbol <= 2'b11;
+		4'b1110: qpsk_symbol <= 2'b01;
+		4'b1010: qpsk_symbol <= 2'b11;
 		endcase
 	end
 	// }}}

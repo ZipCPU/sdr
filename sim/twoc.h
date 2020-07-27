@@ -1,13 +1,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	builddate.v
+// Filename: 	twoc.h
 //
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
-// Purpose:	This file records the date of the last build.  Running "make"
-//		in the main directory will create this file.  The `define found
-//	within it then creates a version stamp that can be used to tell which
-//	configuration is within an FPGA and so forth.
+// Purpose:	Some various two's complement related C++ helper routines.
+//		Specifically, these help extract signed numbers from
+//		packed bitfields, while guaranteeing that the upper bits
+//		are properly sign extended (or not) as desired.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -27,7 +27,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the 1000 4 20 24 27 30 46 113 128 129 999 1000ROOT)/doc directory.  Run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -38,8 +38,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-`ifndef	DATESTAMP
-`define DATESTAMP 32'h20200727
-`define BUILDTIME 32'h00172121
-`endif
-//
+#ifndef	TWOC_H
+#define	TWOC_H
+
+extern	long	sbits(const long val, const int bits);
+extern	unsigned long	ubits(const long val, const int bits);
+
+#endif
+

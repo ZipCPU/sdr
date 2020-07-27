@@ -46,7 +46,6 @@
 // This is useful for guaranteeing any include functions
 // your simulation needs are called.
 //
-// Looking for string: SIM.INCLUDE
 #include "verilated.h"
 #include "Vmain.h"
 #define	BASECLASS	Vmain
@@ -62,7 +61,6 @@
 // This tag is useful fr pasting in any #define values that
 // might then control the simulation following.
 //
-// Looking for string: SIM.DEFINES
 class	MAINTB : public TESTB<Vmain> {
 public:
 		// SIM.DEFNS
@@ -70,7 +68,6 @@ public:
 		// If you have any simulation components, create a
 		// SIM.DEFNS tag to have those components defined here
 		// as part of the main_tb.cpp function.
-// Looking for string: SIM.DEFNS
 	MICNCO	*m_mic;
 	UARTSIM	*m_dbgbus;
 	MAINTB(void) {
@@ -94,14 +91,12 @@ public:
 		// tick with reset set, that logic can be placed into
 		// the SIM.SETRESET tag and thus pasted here.
 		//
-// Looking for string: SIM.SETRESET
 		TESTB<Vmain>::reset();
 		// SIM.CLRRESET
 		// If your simulation component needs logic following the
 		// reset tick, that logic can be placed into the
 		// SIM.CLRRESET tag and thus pasted here.
 		//
-// Looking for string: SIM.CLRRESET
 	}
 
 	void	trace(const char *vcd_trace_file_name) {
@@ -155,6 +150,5 @@ public:
 	// define this tag by those functions (or other sim code), and
 	// it will be pasated here.
 	//
-// Looking for string: SIM.METHODS
 
 };
