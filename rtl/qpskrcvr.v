@@ -110,6 +110,28 @@ module	qpskrcvr #(
 	wire	[PHASE_BITS-1:0]	sym_phase;
 	reg	[2:0]			last_sym_phase, short_phase;
 	wire	[1:0]			sym_err;
+
+	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:4];
+	reg	signed	[AMFIL_BITS-1:0]	filtered_detect;
+	reg	[3:0]	fchain_ce;
+	wire	[BB_BITS*2:0]	cyclic_result;
+	reg				symbol_pipe, too_much_carrier;
+	wire				rmc_busy, rmc_done;
+	reg	[15:0]			carrier_phase, carrier_step,
+					carrier_perr, carrier_ferr;
+	reg	signed	[SOFT_BITS-1:0]		cons_i, cons_q;
+	wire	[6:0]	audio_sample;
+	reg	[1:0]	qpsk_bits;
+	reg		last_cons_i, last_cons_q;
+	reg	[1:0]	frame_count, frame_pos;
+	reg	[3:0]	frame_match;
+	reg	[FC_BITS-1:0]	frame_check	[0:3];
+	reg	[7:0]	frame_sreg;
+	reg		frame_ce;
+	reg	[6:0]	scrambled_sample;
+	reg	[PWM_BITS-1:0]	sigma_delta;
+
+	genvar		gk;
 	// }}}
 
 	////////////////////////////////////////////////////////////////////////
@@ -119,10 +141,17 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
+	//
+	// Here's the place where the design can be configured while running.
+	// You can currently adjust both filters as well as the symbol tracking
+	// PLL coefficient.  In the future, it might be nice to be able to
+	// control carrier tracking as well--for now, we'll just add that to our
+	// TODO list.
+	//
+
 	always @(*)
 		high_symbol_phase = 3'h0;
-// 16,999,524
-// 60,442,752 / 4 = 15,110,688
 
 	initial	load_pll     = 0;
 	initial	pll_lgcoeff  = 5'h5;
@@ -161,6 +190,15 @@ module	qpskrcvr #(
 	// Come down from CLOCK_FREQUENCY_HZ down to 512ksps
 
 	//
+	// A "nice" slow filter requires several clock cycles to operate.
+	// Sadly, our incoming data is coming in at one data value per clock.
+	// To give us some head room for a nicer filter, we'll use a CIC
+	// filter (below).  Once done, we should have about 17 clock cycles
+	// per every outgoing sample which we can then use for our next stage
+	// filter.
+	//
+
+	//
 	// CIC gain = CIC_DOWN ^ 4 ~= 83,531
 	//	Want IW+LGMEM-OW-SHIFT = 23 - SHIFT = 0 for no gain
 	cicfil #(.IW(2), .OW(CIC_BITS), .STAGES(4),
@@ -193,15 +231,12 @@ module	qpskrcvr #(
 	// scale (7 bits), then the output will have 15 bits and we can shift
 	// out anything beyond that
 	//
-	// THE FILTER AS IT EXISTS ISN'T PROPERLY DEFINED.  IT WAS DEFINED AS
-	// SOMETHING THAT WAS *WAY* TOO LONG.  I'VE TRUNCATED IT TO GET IT TO
-	// FIT, AND THE RESULT IS POOR HIGH FREQUENCY RESPONSE AS ONE MIGHT
-	// EXPECT.
+	// THE FILTER AS IT EXISTS ISN'T WELL DESIGNED.  IT WAS ORIGINALLY
+	// DEFINED AS SOMETHING THAT WAS *WAY* TOO LONG.  I'VE TRUNCATED IT
+	// TO A BASIC RECT (SYNC) FILTER, AND SO THE RESULT IS POOR HIGH
+	// FREQUENCY RESPONSE AS ONE MIGHT EXPECT.
 	//
-	//
-	// I've (temporarily) replaced the filter with a block averaging
-	// filter.  This filter has the properties I need in order to lock.
-	//
+	// The result is that this filter needs to be redesigned.
 	//
 	subfildowniq #(.IW(CIC_BITS), .OW(BB_BITS), .CW(12), .SHIFT(5),
 		.INITIAL_COEFFS(PULSE_SHAPE_FILTER),
@@ -244,51 +279,6 @@ module	qpskrcvr #(
 	if (fchain_ce[0])
 		am_detect <= baseband_i_squared + baseband_q_squared;
 
-// `define	OLD_ALGORITHM
-`ifdef	OLD_ALGORITHM
-	//
-	// This only *sort* of works.  It doesn't really work that well.  In
-	// particular, it struggles to coast through large periods w/o
-	// transitions.  There's no easy way to fix this algorithm, so the
-	// separate algorithm below (other side of the if-def) works better.
-	//
-	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:3];
-	reg	signed	[AMFIL_BITS-1:0]	filtered_detect, last_filtered;
-	reg	[3:0]	fchain_ce;
-	//
-	// Generate a filtered_detect signal
-	//
-	always @(posedge i_clk)
-	if (fchain_ce[0])
-	begin
-	// reg		[2*BB_BITS:0]	am_detect;
-		am_sum[0] <= { {(AMFIL_BITS-(2*BB_BITS+1)){1'b0} }, am_detect }
-					+ filtered_detect;
-		// Verilator lint_off WIDTH
-		am_sum[1] <= filtered_detect + (filtered_detect >>> 1);
-		am_sum[2] <= last_filtered - (last_filtered >>> 5);
-	end
-
-	always @(posedge i_clk)
-	if (fchain_ce[1])
-		am_sum[3] <= am_sum[0] + (am_sum[1] >>> 2);
-	// Verilator lint_on  WIDTH
-
-	always @(posedge i_clk)
-	if (fchain_ce[2])
-	begin
-		filtered_detect <= am_sum[3] - am_sum[2];
-		last_filtered <= filtered_detect;
-	end
-
-	assign	amfil_sample = filtered_detect[AMFIL_BITS-1];
-
-`else	// OLD_ALGORITHM
-	reg	signed	[AMFIL_BITS-1:0]	am_sum	[0:4];
-	reg	signed	[AMFIL_BITS-1:0]	filtered_detect;
-	reg	[3:0]	fchain_ce;
-	wire	[BB_BITS*2:0]	cyclic_result;
-
 	cycliciir #(.IW(BB_BITS*2+1), .OW(BB_BITS*2+1), .LGALPHA(6),
 			.NCYCLE(8)
 	) symavg (.i_clk(i_clk), .i_reset(i_reset), .i_ce(fchain_ce[1]),
@@ -307,8 +297,6 @@ module	qpskrcvr #(
 	end
 
 	assign	amfil_sample = filtered_detect[AMFIL_BITS-1];
-`endif	// OLD_ALGORITHM
-
 
 	// Apply a PLL
 	sdpll	#(
@@ -356,19 +344,16 @@ module	qpskrcvr #(
 	//
 
 	//
-	// Working!  (In simulation)
+	// While there shouldn't be any residual carrier offset on the signal,
+	// the Lord knows that two independent oscillators will never be
+	// synchronized.  Therefore, we'll strip off any remaining carrier
+	// here, to include removing any remaining phase offsets.
 	//
 
-	reg				symbol_pipe, too_much_carrier;
-	wire				rmc_busy, rmc_done;
-	reg	[15:0]			carrier_phase, carrier_step,
-					carrier_perr, carrier_ferr;
-	reg	signed	[SOFT_BITS-1:0]		cons_i, cons_q;
-`ifdef	VERILATOR
-	// Verilator lint_off UNUSED
-	(* keep *) reg			carrier_out_of_bounds;
-	// Verilator lint_on  UNUSED
-`endif
+	// Step one, remove the carrier based upon a (yet to be determined)
+	// carrier phase.  We can then use the results as part of a tracking
+	// loop.
+	//
 
 	// Don't really need an 11 stage CORDIC here, but it's what's built
 	// for other parts of the project, so let's just reuse it.
@@ -380,6 +365,20 @@ module	qpskrcvr #(
 			rmc_busy, rmc_done, cons_i, cons_q);
 
 
+	//
+	// This is a pretty rough feedback mechanism.  It works for QPSK
+	// only.  Basically, we'll compare each constellation point to
+	// +/- 45 degrees where |cons_i| should equal |cons_q|.  If the point
+	// is too far clockwise, we'll slow the carrier down, likewise if it
+	// is too far counterclockwise we'll move in the other direction.
+	//
+	// The method is crude since there's no measurement here for how much
+	// farther than desired we've gone.  We're just making a binary choice:
+	// too much carrier or not enough.  There's no inbetween, nor any
+	// shades of gray.  So, it's cheap, and (mostly) works.  (It could work
+	// better.)
+	// 
+
 	// Measure the phase to the nearest quadrant
 	always @(posedge  i_clk)
 	if (rmc_done)
@@ -390,35 +389,25 @@ module	qpskrcvr #(
 		2'b11: too_much_carrier <= (-cons_i < -cons_q);
 		2'b01: too_much_carrier <= ( cons_i > -cons_q);
 		endcase
-`ifdef	VERILATOR
-		carrier_out_of_bounds <= 1'b0;
-		case ({cons_i[BB_BITS-1], cons_q[BB_BITS-1]})
-		2'b00: if (cons_i < cons_q/2)
-				carrier_out_of_bounds <= 1'b1;
-			else if (cons_i/2 > cons_q)
-				carrier_out_of_bounds <= 1'b1;
-		2'b10: if (-cons_i/2 < cons_q)
-				carrier_out_of_bounds <= 1'b1;
-			else if (-cons_i < cons_q/2)
-				carrier_out_of_bounds <= 1'b1;
-		2'b11: if (-cons_i < -cons_q/2)
-				carrier_out_of_bounds <= 1'b1;
-			else if (-cons_i/2 > -cons_q)
-				carrier_out_of_bounds <= 1'b1;
-		2'b01: if (cons_i/2 > -cons_q)
-				carrier_out_of_bounds <= 1'b1;
-			else if (cons_i < -cons_q/2)
-				carrier_out_of_bounds <= 1'b1;
-		endcase
-`endif
 	end
 
 	always @(posedge i_clk)
 		symbol_pipe <= rmc_done;
 
+	//
+	// The key to the algorithm is in the amount of phase to adjust
+	// in each direction on a phase error.  Here's our phase adjustment
+	// control
+	//
 	always @(*)
 		carrier_perr = 16'h0100;
 
+	//
+	// The frequency adjustment control
+	//
+	// For critical damping, you'll want this value to follow the following
+	// formula:
+	//
 	// formula = perr ^2 / 4	(in radians)
 	//     = ( (2*pi*carrier_perr/2^16)^2 / 4 ) * (2^16 / 2/pi) = 1.5
 	always @(*)
@@ -453,9 +442,14 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	reg	[1:0]	qpsk_bits;
-	reg		last_cons_i, last_cons_q;
 
+	//
+	// We are encoding our symbols using phase difference encoding.
+	// That's great for locking, since you don't need to know the absolute
+	// phase of the symbols, and the encoding is a bit more resilient to
+	// frequency offsets.  It will also propagate errors somewhat.  Here,
+	// we strip that encoding back off.
+	//
 	always @(posedge i_clk)
 	if (symbol_ce)
 	begin
@@ -495,16 +489,15 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	reg	[1:0]	frame_count, frame_pos;
-	reg	[3:0]	frame_match;
-	reg	[FC_BITS-1:0]	frame_check	[0:3];
-	reg	[7:0]	frame_sreg;
-	reg		frame_ce;
-	reg	[6:0]	scrambled_sample;
-	genvar		gk;
 
-	// Add 1 on match, -1 on fail
-	// Look for overflow
+	//
+	// In this scheme, of every 8-bits [7:0] bits 7 and 6 should differ.
+	// Here, we'll go look for the cut that has this difference.  We'll
+	// do this by examining all four possible cuts.  Whenever we see
+	// a bit difference, we'll add one to a counter.  The correct counter
+	// should max out and then overflow--that's how we'll know we've
+	// achieved synchronization.
+	//
 
 	always @(posedge i_clk)
 	if (symbol_ce)
@@ -563,8 +556,10 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	wire	[6:0]	audio_sample;
 
+	//
+	// Feed through descrambler
+	//
 	descrambler #(.WS(7), .LN(31), .TAPS(31'h00_00_20_01))
 	recover(i_clk, 1'b0, frame_ce, scrambled_sample, audio_sample);
 
@@ -576,8 +571,6 @@ module	qpskrcvr #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	reg	[PWM_BITS-1:0]	sigma_delta;
-
 	always @(posedge i_clk)
 	if (i_audio_en)
 		sigma_delta <= sigma_delta

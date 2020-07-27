@@ -138,6 +138,7 @@ module	qpskxmit #(
 				write_audio, write_pulse;
 	reg [15:0]		write_coeff;
 
+	wire	[6:0]	scrambled_sample;
 	reg		qpsk_ce, qpsk_valid;
 	reg	[1:0]	qpsk_bits, qpsk_symbol, qpsk_count;
 	reg	[5:0]	qpsk_sreg;
@@ -151,6 +152,7 @@ module	qpskxmit #(
 	wire			pulse_ready, pulse_ce;
 
 	reg	[PWM_BITS-1:0]	sdi_integrator, sdq_integrator;
+
 	// }}}
 
 	////////////////////////////////////////////////////////////////////////
@@ -159,6 +161,13 @@ module	qpskxmit #(
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
+	//
+
+	//
+	// Our current bus write interface only allows adjusting our filter
+	// coefficients.  We still have two addresses left for us to do
+	// something more if we would rather.  Sadly, while you can write
+	// these coefficients, you can't read them back currently.
 	//
 	always @(posedge i_clk)
 		reset_audio <= i_wb_stb && i_wb_we
@@ -216,7 +225,7 @@ module	qpskxmit #(
 	//
 	//
 	subfildown #(.IW(MIC_BITS), .OW(AUDIO_BITS), .CW(12),
-		.SHIFT(7),
+		.SHIFT(7),	// Applies a 2^SHIFT gain to the incoming signal
 		.NDOWN(RAW_AUDIO_DOWNSAMPLE_RATIO),
 		.FIXED_COEFFS(1'b0),
 		.NCOEFFS(NUM_AUDIO_COEFFS),
@@ -230,26 +239,14 @@ module	qpskxmit #(
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	wire	[6:0]	w_scrambled_sample;
-	reg	[6:0]	scrambled_sample;
-//	reg	[2:0]	r_scrambled_skip_count;
-//	reg		r_scrambled_skip;
 
+	//
+	// Apply a feedthrough randomizer to guarantee some amount of
+	// transitions to later lock onto.
+	//
 	scrambler #(.WS(7), .LN(31), .TAPS(31'h00_00_20_01))
-	randomizer(i_clk, i_reset, audio_ce, audio_sample, w_scrambled_sample);
+	randomizer(i_clk, i_reset, audio_ce, audio_sample, scrambled_sample);
 
-//	always @(posedge i_clk)
-////	if (audio_ce)
-//	begin
-//		r_scrambled_skip_count <= r_scrambled_skip_count + 1;
-//		r_scrambled_skip <= (r_scrambled_skip_count  == 0);
-//	end
-
-	always @(*)
-//	if (r_scrambled_skip)
-//		scrambled_sample = 0;
-//	else
-		scrambled_sample = w_scrambled_sample;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -257,6 +254,15 @@ module	qpskxmit #(
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
+	//
+
+	//
+	// This particular radio has an 8-bit frame, equal to one 7-bit sample
+	// plus a frame synchronization bit.  Here, we set the 8-th
+	// synchronization bit to guarantee a 90 degree transition on the first
+	// symbol of every frame.  As compared to other framing schemes,
+	// this one will keep us from leaking carrier into our signal, and so
+	// keep us balanced.
 	//
 
 	always @(posedge i_clk)
@@ -292,6 +298,9 @@ module	qpskxmit #(
 	//	------------------
 	//	11	|	10
 	//
+	// Remember, this is a *differential* encoding.  Hence, we need to know
+	// the last symbol in order to know what the next symbol will be.
+	//
 	always @(posedge i_clk)
 	if (qpsk_ce)
 	begin
@@ -320,6 +329,12 @@ module	qpskxmit #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
+	//
+	// This uses a quick filter to upsamples our signal by a factor of 4.
+	// That should be enough to run a decent antialiasing filter (here).
+	//
+
 	pulseshaperiq #(.NUP(4), .NCOEFFS(64),
 		.IW(2), .SHIFT(7), .OW(BB_BITS), .CW(12),
 		.FIXED_COEFFS(1'b0),
@@ -330,6 +345,12 @@ module	qpskxmit #(
 					{ qpsk_symbol[0], 1'b1 },
 				pulse_ce, pulse_i, pulse_q);
 
+	//
+	// The problem is that the filter produces results as fast as it can.
+	// We need to slow those back down to what we are expecting here.
+	// Hence, we'll stuff the extras into a FIFO which we'll read from
+	// at our proper data rate.
+	//
 	sfifo #(.BW(2*BB_BITS), .LGFLEN(LGFIFO),
 		.OPT_ASYNC_READ(1'b0)
 		// .OPT_WRITE_ON_FULL(1'b0),
@@ -394,6 +415,12 @@ module	qpskxmit #(
 	//
 	//
 
+	//
+	// Just a basic single-integrator sigma-delta implementation.  We could
+	// get fancier if we wanted to, but I personally seem to keep getting
+	// bitten by overflow when I do so.
+	//
+
 	always @(posedge i_clk)
 		sdi_integrator <= { 1'b0, sdi_integrator[PWM_BITS-2:0] }
 			+ { 1'b0, !baseband_i[BB_BITS-1],
@@ -406,6 +433,9 @@ module	qpskxmit #(
 				baseband_q[BB_BITS-2:0],
 				{(PWM_BITS-BB_BITS-1){1'b0} }};
 
+	//
+	// The outgoing data is the overflow from the sigma-delta integrator(s).
+	//
 	always @(posedge i_clk)
 	if (i_rf_en)
 		o_rf_data <= { sdi_integrator[PWM_BITS-1],
@@ -422,6 +452,11 @@ module	qpskxmit #(
 	//
 	//
 
+	//
+	// We support four separate debugging channels.  The can be used
+	// in a sample-for-sample recording, or histogram, or constellation
+	// plot (special case of the histogram).
+	//
 	always @(posedge i_clk)
 	case(i_dbg_sel)
 	// Microphone
