@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	wbregs.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	To give a user access, via a command line program, to read
@@ -13,9 +13,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -30,14 +30,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,6 +58,7 @@ void	closeup(int v) {
 }
 
 bool	isvalue(const char *v) {
+	//  {{{
 	const char *ptr = v;
 
 	while(isspace(*ptr))
@@ -74,9 +75,10 @@ bool	isvalue(const char *v) {
 	}
 
 	return (isdigit(*ptr));
-}
+} // }}}
 
 void	usage(void) {
+	// {{{
 	printf("USAGE: wbregs [-d] address [value]\n"
 "\n"
 "\tWBREGS stands for Wishbone registers.  It is designed to allow a\n"
@@ -100,7 +102,7 @@ void	usage(void) {
 "\tIf a value is given, that value will be written to the indicated\n"
 "\taddress, otherwise the result from reading the address will be \n"
 "\twritten to the screen.\n", FPGAHOST, FPGAPORT);
-}
+} // }}}
 
 int main(int argc, char **argv) {
 	int	skp=0;
@@ -108,6 +110,8 @@ int main(int argc, char **argv) {
 	const char *host = FPGAHOST;
 	int	port=FPGAPORT;
 
+	// Argument processing
+	// {{{
 	skp=1;
 	for(int argn=0; argn<argc-skp; argn++) {
 		if (argv[argn+skp][0] == '-') {
@@ -135,6 +139,7 @@ int main(int argc, char **argv) {
 		} else
 			argv[argn] = argv[argn+skp];
 	} argc -= skp;
+	// }}}
 
 	m_fpga = new FPGA(new NETCOMMS(host, port));
 
@@ -147,6 +152,8 @@ int main(int argc, char **argv) {
 		exit(-1);
 	}
 
+	// Look up the requested address and get a name for it (if available)
+	// {{{
 	const char *nm = NULL, *named_address = argv[0];
 	unsigned address, value;
 
@@ -160,8 +167,10 @@ int main(int argc, char **argv) {
 
 	if (NULL == nm)
 		nm = "";
+	// }}}
 
-	if (argc < 2) {
+	if (argc < 2) { // Read from the bus
+		// {{{
 		FPGA::BUSW	v;
 		try {
 			unsigned char a, b, c, d;
@@ -182,7 +191,9 @@ int main(int argc, char **argv) {
 			printf("Caught bug: %s\n", er);
 			exit(EXIT_FAILURE);
 		}
-	} else {
+		// }}}
+	} else { // Write a value to the bubus
+		// {{{
 		try {
 			value = strtoul(argv[1], NULL, 0);
 			m_fpga->writeio(address, value);
@@ -194,6 +205,7 @@ int main(int argc, char **argv) {
 			printf("Caught bug on write: %s\n", er);
 			exit(EXIT_FAILURE);
 		}
+		// }}}
 	}
 
 	if (m_fpga->poll())

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	i2csim.h
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	To create an I2C slave simulation that can then be driven and
@@ -11,9 +11,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,14 +28,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #ifndef	I2CSIM_H
 #define	I2CSIM_H
 
@@ -44,6 +44,7 @@
 #include <string.h>
 
 class	I2CBUS {
+// {{{
 public:
 	unsigned int	m_scl:1;
 	unsigned int	m_sda:1;
@@ -54,6 +55,7 @@ public:
 		m_scl &= b.m_scl; m_sda &= b.m_sda;
 		return *this;
 	}
+// }}}
 };
 
 typedef	enum { I2CIDLE=0, I2CDEVADDR, I2CDEVACK,
@@ -61,6 +63,7 @@ typedef	enum { I2CIDLE=0, I2CDEVADDR, I2CDEVACK,
 } I2CSTATE;
 
 class	I2CSIMSLAVE {
+	// {{{
 	char	*m_data;
 	int	m_addr, m_daddr, m_abits, m_dbits, m_dreg, m_ack,
 			m_last_sda, m_last_scl, m_counter, m_devword,
@@ -71,31 +74,39 @@ class	I2CSIMSLAVE {
 	I2CBUS	m_bus; // My inputs
 
 	I2CSTATE	m_state;
+	// }}}
 
 	volatile int	getack(int addr) {
+		// {{{
 		m_ack = 0;
 		return m_ack;
-	}
+	} // }}}
 	volatile char	read(int addr) {
+		// {{{
 		// printf("SETTING READ ADDRESS TO %02x\n", m_daddr & m_adrmsk);
 		m_daddr = addr;
 		return m_data[m_daddr];
-	}
+	} // }}}
 	volatile char	read(void) {
+		// {{{
 		char	vl = m_data[m_daddr];
 		// printf("READING FROM ADDRESS %02x\n", m_daddr & m_adrmsk);
 		m_daddr = (m_daddr+1)&m_adrmsk;
 		return vl;
-	}
+	} // }}}
 	volatile void	write(int addr, char data) {
+		// {{{
 		m_daddr = addr & m_adrmsk;
 		m_data[m_daddr] = data;
 	} volatile void	write(char data) {
+		// {{{
 		m_daddr = (m_daddr+1) & m_adrmsk;
 		m_data[m_daddr] = data;
-	}
+	} // }}}
+	// }}}
 public:
 	I2CSIMSLAVE(const int ADDRESS = 0x050, const int nbits = 7) {
+		// {{{
 		m_memsz = (1<<nbits);
 		m_adrmsk = m_memsz-1;
 		m_data = new char[m_memsz];
@@ -114,7 +125,7 @@ public:
 		m_daddr = 0;
 
 		memset(m_data, 0, m_memsz);
-	}
+	} // }}}
 
 	I2CBUS	operator()(int scl, int sda);
 	I2CBUS	operator()(const I2CBUS b) { return (*this)(b.m_scl, b.m_sda); }

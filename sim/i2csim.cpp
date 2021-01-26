@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	i2csim.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,32 +27,36 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include "i2csim.h"
 
 I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
+	// {{{
 	I2CBUS	r(scl, sda); // Our default result
 
 	if ((scl & m_bus.m_scl)&&(m_last_scl)
 			&&(sda & m_bus.m_sda)&&(!m_last_sda)) {
 		// Stop bit: Low to high transition with scl high
+		// {{{
 		// Leave the bus as is
 		// printf("START BIT: Setting state to idle\n");
 		m_state = I2CIDLE;
 		m_illegal = false;
 
 		m_bus.m_scl = m_bus.m_sda = 1;
+		// }}}
 	} else {
 		m_bus.m_scl = m_bus.m_sda = 1;
 		switch(m_state) {
 		case I2CIDLE:
+			// {{{
 			if (!scl) {
 				m_state = I2CILLEGAL;
 			} else if (!sda) {
@@ -63,7 +67,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				m_dbits = 0;
 			} // The the bus as it was on entry
 			break;
+			// }}}
 		case	I2CDEVADDR:
+			// {{{
 			if ((scl)&&(!m_last_scl)) {
 				m_addr = (m_addr<<1)|sda;
 				m_abits++;
@@ -81,7 +87,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				assert(sda == m_last_sda);
 			} // The the bus as it was on entry
 			break;
+			// }}}
 		case	I2CDEVACK:
+			// {{{
 			// Ack the master's device request, it's for us.  We
 			// come in here before the negative edge of the last
 			// bit, though
@@ -114,7 +122,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				}
 			} m_dbits = 0;
 			break;
+			// }}}
 		case	I2CADDR:
+			// {{{
 			if ((scl)&&(!m_last_scl)) {
 				m_addr = (m_addr<<1)|sda;
 				m_abits++;
@@ -128,7 +138,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				assert(sda == m_last_sda);
 			} // The the bus as it was on entry
 			break;
+			// }}}
 		case	I2CSACK:
+			// {{{
 			// Ack the master
 			if ((m_counter == 0)&&(r.m_scl)) {
 				// Wait for the first negative edge, from the
@@ -148,7 +160,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				}
 			} m_dbits = 0;
 			break;
+			// }}}
 		case	I2CSRX:	// Master is writing to us, we are receiving
+			// {{{
 			if (r.m_scl) {
 				// Not allowed to change when clock is high
 				if (m_last_scl)
@@ -164,7 +178,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 					}
 				} m_counter = 0;
 			} break;
+			// }}}
 		case	I2CSTX: // Master is reading from us, we are txmitting
+			// {{{
 			//if (!sda) { // assert(sda); }
 			if ((m_counter == 0)&&(r.m_scl)) {
 			} else if (m_counter++ < 20) {
@@ -183,7 +199,9 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 					m_dbits = 0;
 				}
 			} break;
+			// }}}
 		case	I2CMACK:
+			// {{{
 			// Insist that the master actually ACK
 			//
 			// Sadly, we can't.  The master can NAK and ... that's
@@ -200,13 +218,17 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				}
 			} m_dbits = 0;
 			break;
+			// }}}
 		case	I2CLOSTBUS:
+			// {{{
 			// Not a problem, but ... someone else is driving the
 			// bus.  We let them respond to the bus
 			m_state = I2CLOSTBUS;
 			break;
+			// }}}
 		case	I2CILLEGAL:	// fall through
 		default:
+			// {{{
 			m_bus.m_scl = 1;
 			m_bus.m_sda = 1;
 			if (!m_illegal) {
@@ -216,12 +238,14 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 				assert(0);
 			}
 			break;
+		// }}}
 	}}
 
-//
 	// printf("TICK: SCL,SDA = %d,%d\n", scl, sda);
 	m_tick++;
 	r += m_bus;
+	// m_last_change_tick
+	// {{{
 	if ((r.m_scl != m_last_scl)||(r.m_sda != m_last_sda)) {
 		/*
 		if ((m_last_change_tick>0)&&(m_tick - m_last_change_tick < m_speed)) {
@@ -234,11 +258,13 @@ I2CBUS	I2CSIMSLAVE::operator()(int scl, int sda) {
 		} */
 		m_last_change_tick = m_tick;
 	}
+	// }}}
 
 	m_last_scl = r.m_scl;
 	m_last_sda = r.m_sda;
 	// printf("TICK: LAST SCL,SDA = %d,%d\n", m_last_scl, m_last_sda);
 
 	return r;
+	// }}}
 }
 

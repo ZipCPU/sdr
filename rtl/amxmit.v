@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	amxmit.txt
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,8 +27,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
@@ -36,9 +37,9 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	amxmit #(
-		//
+		// {{{
 		parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
 		parameter [31:0]	RAW_DATA_RATE_HZ = 500_000,
 		parameter [0:0]		OPT_CIC_FILTER = 1'b1,
@@ -56,8 +57,9 @@ module	amxmit #(
 					* 1.0 / CLOCK_FREQUENCY_HZ
 		// Verilator lint_on  REALCVT
 		//
-		//
+		// }}}
 	) (
+		// {{{
 		input	wire	i_clk, i_reset,
 		input	wire	i_audio_en, i_rf_en,
 		//
@@ -82,18 +84,20 @@ module	amxmit #(
 		output	reg		o_dbg_ce,
 		output	reg	[31:0]	o_dbg_data,
 		output	reg	[HIST_BITS-1:0]	o_dbg_hist
+		// }}}
 	);
-	//
 
+	// Local parameter declarations
+	// {{{
 	localparam	MIC_BITS=12, CIC_BITS=16;
 
-	localparam	PHASE_BITS = 24;
-	localparam	AM_BITS = 24;
+	// localparam	PHASE_BITS = 24;
+	// localparam	AM_BITS = 24;
 	localparam	GAIN_BITS = 16+12;
 	localparam	CARRIER_GAIN = GAIN_BITS-14;
 	localparam	PWM_BITS = GAIN_BITS + 1;
 	localparam	OPT_SIGMA_DELTA = 1'b1;
-
+	// }}}
 
 	// Declare registers and nets
 	// {{{
@@ -114,7 +118,6 @@ module	amxmit #(
 	wire	signed	[11:0]	cic_signed;
 	wire	signed	[15:0]	gain_signed;
 	// }}}
-
 
 	////////////////////////////////////////////////////////////////////////
 	//

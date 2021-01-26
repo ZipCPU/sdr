@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	addrdecode.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,8 +27,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
@@ -36,7 +37,7 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	addrdecode(i_clk, i_reset, i_valid, o_stall, i_addr, i_data,
 			o_valid, i_stall, o_decode, o_addr, o_data);
 	parameter	NS=8;
@@ -86,9 +87,9 @@ module	addrdecode(i_clk, i_reset, i_valid, o_stall, i_addr, i_data,
 	// must also allow access.
 	localparam [0:0] OPT_NONESEL = (!ACCESS_ALLOWED[0])
 					|| (SLAVE_MASK[AW-1:0] != 0);
-	//
+	// Verilator lint_off UNUSED
 	input	wire			i_clk, i_reset;
-	//
+	// Verilator lint_on  UNUSED
 	input	wire			i_valid;
 	output	reg			o_stall;
 	input	wire	[AW-1:0]	i_addr;

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	rfregs.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <signal.h>
 #include <stdint.h>
 #include <time.h>
@@ -164,20 +164,25 @@ unsigned	rfaddrbytes(const unsigned v) {
 #define	SCL_ON(A)	A->writeio(R_GPIO, SET_GPIO(SCL_BIT))
 
 void	i2c_start(FPGA *m_fpga) {
+	// {{{
 	SDA_OFF(m_fpga);
 	m_fpga->readio(R_GPIO);
 	SCL_OFF(m_fpga);
+	// }}}
 }
 
 void	i2c_stop(FPGA *m_fpga) {
+	// {{{
 	SDA_OFF(m_fpga);
 	m_fpga->readio(R_GPIO);
 	SCL_ON(m_fpga);
 	m_fpga->readio(R_GPIO);
 	SDA_ON(m_fpga);
+	// }}}
 }
 
 int	i2c_read_byte(FPGA *m_fpga, int ack = 1) {
+	// {{{
 	int	result = 0, v;
 
 	SDA_ON(m_fpga);
@@ -202,9 +207,11 @@ int	i2c_read_byte(FPGA *m_fpga, int ack = 1) {
 	SDA_ON(m_fpga);
 
 	return result;
+	// }}}
 }
 
 int	i2c_write_byte(FPGA *m_fpga, unsigned byte) {
+	// {{{
 	int	v;
 
 	for(int k=0; k<8; k++) {
@@ -238,9 +245,11 @@ int	i2c_write_byte(FPGA *m_fpga, unsigned byte) {
 	if ((v & SDA_INPUT)!=0)
 		return 1;
 	return 0;
+	// }}}
 }
 
 int	i2c_read(FPGA *m_fpga, int msglen, char *msg) {
+	// {{{
 	int	retries = 0;
 	int	err = 0;
 
@@ -263,9 +272,11 @@ int	i2c_read(FPGA *m_fpga, int msglen, char *msg) {
 	i2c_stop(m_fpga);
 
 	return 0;
+	// }}}
 }
 
 int	i2c_write(FPGA *m_fpga, int msglen, char *msg) {
+	// {{{
 	int	retries = 0;
 	int	err = 0;
 
@@ -285,10 +296,12 @@ int	i2c_write(FPGA *m_fpga, int msglen, char *msg) {
 	i2c_stop(m_fpga);
 
 	return err;
+	// }}}
 }
 
 
 unsigned	read_rfreg(FPGA *m_fpga, unsigned addr, unsigned  count = 1) {
+	// {{{
 	char		msg[32];
 	int		msglen = 0;
 	unsigned	result;
@@ -308,9 +321,11 @@ unsigned	read_rfreg(FPGA *m_fpga, unsigned addr, unsigned  count = 1) {
 	for(int k=0; k<(int)count; k++)
 		result = (result << 8) | (msg[1+k] & 0x0ff);
 	return result;
+	// }}}
 }
 
 void	write_rfreg(FPGA *m_fpga, unsigned addr, unsigned value, int count=1) {
+	// {{{
 	char		msg[32];
 	int		msglen = 0;
 
@@ -320,9 +335,11 @@ void	write_rfreg(FPGA *m_fpga, unsigned addr, unsigned value, int count=1) {
 		msg[msglen++] = (value >> (count-1-k)*8);;
 
 	i2c_write(m_fpga, msglen, msg);
+	// }}}
 }
 
 void	rf_config(FPGA *m_fpga) {
+	// {{{
 	char	msg[32];
 	int	msglen;
 
@@ -374,6 +391,7 @@ void	rf_config(FPGA *m_fpga) {
 
 	i2c_write(m_fpga, msglen, msg);
 */
+	// }}}
 }
 
 FPGA	*m_fpga;
@@ -383,6 +401,7 @@ void	closeup(int v) {
 }
 
 bool	isvalue(const char *v) {
+	// {{{
 	const char *ptr = v;
 
 	while(isspace(*ptr))
@@ -399,6 +418,7 @@ bool	isvalue(const char *v) {
 	}
 
 	return (isdigit(*ptr));
+	// }}}
 }
 
 void	usage(void) {
@@ -411,6 +431,8 @@ int main(int argc, char **argv) {
 	bool	config_flag = false;
 	int	skp;
 
+	// Argument processing
+	// {{{
 	skp = 1;
 	for(int argn=0; argn<argc-skp; argn++) {
 		skp++;
@@ -421,6 +443,7 @@ int main(int argc, char **argv) {
 			argv[argn] = argv[argn+skp];
 		}
 	} argc -= skp;
+	// }}}
 
 	m_fpga = new FPGA(new NETCOMMS(host, port));
 
@@ -453,8 +476,8 @@ int main(int argc, char **argv) {
 	if (NULL == nm)
 		nm = "";
 
-	if (argc < 2) {
-		// Read a register
+	if (argc < 2) { // Read a register
+		// {{{
 		FPGA::BUSW	v;
 		try {
 			unsigned char a, b, c, d, msglen;
@@ -476,8 +499,9 @@ int main(int argc, char **argv) {
 			printf("Caught bug: %s\n", er);
 			exit(EXIT_FAILURE);
 		}
-	} else {
-		// Write to a register
+		// }}}
+	} else { // Write to a register
+		// {{{
 		try {
 			value = strtoul(argv[1], NULL, 0);
 			write_rfreg(m_fpga, address, value);
@@ -489,6 +513,7 @@ int main(int argc, char **argv) {
 			printf("Caught bug on write: %s\n", er);
 			exit(EXIT_FAILURE);
 		}
+		// }}}
 	}
 
 	if (m_fpga->poll())

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	sintable.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This is a very simple sinewave table lookup approach
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -33,39 +33,50 @@
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
-module	sintable(i_clk, i_reset, i_ce, i_aux, i_phase, o_val, o_aux);
-	//
+// }}}
+module	sintable #(
+		// {{{
 	parameter	PW = 8, // Number of bits in the input phase
-			OW =12; // Number of output bits
+			OW =12 // Number of output bits
+		// }}}
+	) (
+		// {{{
+	input	wire			i_clk, i_reset, i_ce,
+	input	wire	[(PW-1):0]	i_phase,
+	output	reg	[(OW-1):0]	o_val,
 	//
-	input	wire			i_clk, i_reset, i_ce;
-	input	wire	[(PW-1):0]	i_phase;
-	output	reg	[(OW-1):0]	o_val;
-	//
-	input	wire			i_aux;
-	output	reg			o_aux;
+	input	wire			i_aux,
+	output	reg			o_aux
+		// }}}
+	);
 
+	// Declare variables
+	// {{{
 	reg	[(OW-1):0]		tbl	[0:((1<<PW)-1)];
-
+	// }}}
 	initial	$readmemh("sintable.hex", tbl);
 
+	// o_val
+	// {{{
 	initial	o_val = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		o_val <= 0;
 	else if (i_ce)
 		o_val <= tbl[i_phase];
+	// }}}
 
+	// o_aux
+	// {{{
 	initial	o_aux = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		o_aux <= 0;
 	else if (i_ce)
 		o_aux <= i_aux;
+	// }}}
+
 endmodule

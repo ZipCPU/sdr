@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	automaster_tb.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This file calls and accesses the main.v function via the
@@ -13,9 +13,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -30,14 +30,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
@@ -56,6 +56,8 @@
 
 #include "main_tb.cpp"
 
+// usage()
+// {{{
 void	usage(void) {
 	fprintf(stderr, "USAGE: main_tb <options>\n");
 	fprintf(stderr,
@@ -66,6 +68,7 @@ void	usage(void) {
 "\t-d\tSets the debugging flag\n"
 );
 }
+// }}}
 
 int	main(int argc, char **argv) {
 	Verilated::commandArgs(argc, argv);
@@ -75,6 +78,8 @@ int	main(int argc, char **argv) {
 
 	MAINTB	*tb = new MAINTB;
 
+	// Argument processing
+	// {{{
 	for(int argn=1; argn < argc; argn++) {
 		if (argv[argn][0] == '-') for(int j=1;
 					(j<512)&&(argv[argn][j]);j++) {
@@ -96,6 +101,7 @@ int	main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}
+	// }}}
 
 	if (debug_flag) {
 		printf("Opening design with\n");

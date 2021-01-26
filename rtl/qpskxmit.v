@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	qpskxmit.txt
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	QPSK Audio transmitter
@@ -35,9 +35,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -52,8 +52,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
@@ -61,19 +62,19 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	qpskxmit #(
 		// {{{
 		//
-		parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
-		parameter [31:0]	BASEBAND_SAMPLE_RATE_HZ
-					    = CLOCK_FREQUENCY_HZ / (17 * 4 * 4),
-		parameter [31:0]	SYMBOL_RATE_HZ= CLOCK_FREQUENCY_HZ
-							/ ( 17 * 4 * 8),
-		parameter [31:0]	AUDIO_RATE_HZ
-					    = CLOCK_FREQUENCY_HZ / (17 * 128),
-		parameter [31:0]	MICROPHONE_SAMPLE_RATE_HZ
-					    = CLOCK_FREQUENCY_HZ / (17 * 4),
+		// parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
+		// parameter [31:0]	BASEBAND_SAMPLE_RATE_HZ
+		//			    = CLOCK_FREQUENCY_HZ / (17 * 4 * 4),
+		// parameter [31:0]	SYMBOL_RATE_HZ= CLOCK_FREQUENCY_HZ
+		//					/ ( 17 * 4 * 8),
+		// parameter [31:0]	AUDIO_RATE_HZ
+		//			    = CLOCK_FREQUENCY_HZ / (17 * 128),
+		// parameter [31:0]	MICROPHONE_SAMPLE_RATE_HZ
+		//			    = CLOCK_FREQUENCY_HZ / (17 * 4),
 		parameter		NUM_AUDIO_COEFFS = 1999,
 		parameter		HIST_BITS = 10,
 		localparam		PWM_BITS  = 16,
@@ -116,7 +117,7 @@ module	qpskxmit #(
 	localparam	AUDIO_BITS= 7;
 	localparam	BB_BITS   = 12;
 	// localparam	XMIT_AUDIO_BITS= 12;
-	localparam	LGFLEN = 3;
+	// localparam	LGFLEN = 3;
 	localparam	LGFIFO = 4;
 	localparam	CLOCKS_PER_BB_SAMPLE = 17 * 8;
 			// = (CLOCK_FREQUENCY_HZ / BASEBAND_SAMPLE_RATE_HZ);

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	devbus.h
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	The purpose of this file is to document an interface which
@@ -21,9 +21,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -38,14 +38,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #ifndef	DEVBUS_H
 #define	DEVBUS_H
 
@@ -67,20 +67,25 @@ public:
 	virtual	void	kill(void) = 0;
 	virtual	void	close(void) = 0;
 
-	// Write a single value to a single address
+	// writeio: Write a single value to a single address
+	// {{{
 	//	a is the address of the value to be read as it exists on the
 	//		wishbone bus within the FPGA.
 	//	v is the singular value to write to this address
 	virtual	void	writeio(const BUSW a, const BUSW v) = 0;
+	// }}}
 
-	// Read a single value to a single address
+	// readio: Read a single value to a single address
+	// {{{
 	//	a is the address of the value to be read as it exists on the
 	//		wishbone bus within the FPGA.
 	//	This function returns the value read from the device wishbone
 	//		at address a.
 	virtual	BUSW	readio(const BUSW a) = 0;
+	// }}}
 
-	// Read a series of values from values from a block of memory
+	// readi: Read a series of values from values from a block of memory
+	// {{{
 	//	a is the address of the value to be read as it exists on the
 	//		wishbone bus within the FPGA.
 	//	len is the number of words to read
@@ -90,8 +95,10 @@ public:
 	//		buf[i] = readio(a+i);
 	// only it's faster in our implementation.
 	virtual	void	readi(const BUSW a, const int len, BUSW *buf) = 0;
+	// }}}
 
-	// Read a series of values from the same address in memory.  This
+	// readz: Read a series of values from the same address in memory.  This
+	// {{{
 	// call is identical to readi, save that the address is not incremented
 	// from one read to the next.  It is equivalent to:
 	//	for(int i=0; i<len; i++)
@@ -99,8 +106,10 @@ public:
 	// only it's faster in our implementation.
 	//
 	virtual	void	readz(const BUSW a, const int len, BUSW *buf) = 0;
+	// }}}
 
-	// Write a series of values into a block of memory on the FPGA
+	// writei: Write a series of values into a block of memory on the FPGA
+	// {{{
 	//	a is the address of the value to be written as it exists on the
 	//		wishbone bus within the FPGA.
 	//	len is the number of words to write
@@ -110,15 +119,18 @@ public:
 	//	for(int i=0; i<len; i++)
 	//		writeio(a+i, buf[i]);
 	// only it's faster in our implementation.
-	virtual	void	writei(const BUSW a, const int len, const BUSW *buf) = 0;
-	// Write a series of values into the same address on the FPGA bus.  This
-	// call is identical to writei, save that the address is not incremented
-	// from one write to the next.  It is equivalent to:
+	virtual	void	writei(const BUSW a, const int len, const BUSW *buf)= 0;
+	// }}}
+	// writez: Write a series of values into the same address on the FPGA
+	// {{{
+	// bus.  This call is identical to writei, save that the address is not
+	// incremented from one write to the next.  It is equivalent to:
 	//	for(int i=0; i<len; i++)
 	//		writeio(a, buf[i]);
 	// only it's faster in our implementation.
 	//
-	virtual	void	writez(const BUSW a, const int len, const BUSW *buf) = 0;
+	virtual	void	writez(const BUSW a, const int len, const BUSW *buf)= 0;
+	// }}}
 
 	// Query whether or not an interrupt has taken place
 	virtual	bool	poll(void) = 0;
@@ -130,17 +142,21 @@ public:
 	// interrupt to take place
 	virtual	void	wait(void) = 0;
 
-	// Query whether or not a bus error has taken place.  This is somewhat
-	// of a misnomer, as my current bus error detection code exits any
-	// interface, but ... it is what it is.
+	// bus_err: Query whether or not a bus error has taken place.  This is
+	// {{{
+	// somewhat of a misnomer, as my current bus error detection code exits
+	// any interface, but ... it is what it is.
 	virtual	bool	bus_err(void) const = 0;
+	// }}}
 
 	// Clear any bus error condition.
 	virtual	void	reset_err(void) = 0;
 
-	// Clear any interrupt condition that has already been noticed by
+	// clear: Clear any interrupt condition that has already been noticed by
+	// {{{
 	// the interface, does not check for further interrupt
 	virtual	void	clear(void) = 0;
+	// }}}
 
 	virtual	~DEVBUS(void) { };
 };

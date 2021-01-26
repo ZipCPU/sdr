@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	qpskrcvr.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,22 +27,22 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
+// }}}
 module	qpskrcvr #(
 		// {{{
-		parameter	CLOCK_FREQUENCY_HZ = 36_000_000,
-		parameter	BASEBAND_SAMPLE_RATE_HZ
-						= CLOCK_FREQUENCY_HZ / (17 * 4),
-		parameter	CIC_SAMPLE_RATE_HZ = BASEBAND_SAMPLE_RATE_HZ* 4,
+		// parameter	CLOCK_FREQUENCY_HZ = 36_000_000,
+		//parameter	BASEBAND_SAMPLE_RATE_HZ
+		//				= CLOCK_FREQUENCY_HZ / (17 * 4),
+		//parameter	CIC_SAMPLE_RATE_HZ = BASEBAND_SAMPLE_RATE_HZ* 4,
 		localparam	CIC_DOWN = 17,
 		localparam	RESAMPLE_DOWN = 4,
 		//
@@ -89,7 +89,9 @@ module	qpskrcvr #(
 	localparam	NUM_DOWNSAMPLE_COEFFS = 63;
 	localparam	PULSE_SHAPE_FILTER = "pshape8x.hex";
 
-	reg	[2:0]			high_symbol_phase;
+	reg	[2:0]			high_symbol_phase,
+					past_high_symbol_phase;
+	reg				track_frequency;
 	reg				load_pll;
 	reg	[PHASE_BITS-1:0]	new_pll_step;
 	reg	[4:0]			pll_lgcoeff;
@@ -103,7 +105,6 @@ module	qpskrcvr #(
 
 	reg	signed	[2*BB_BITS-1:0]	baseband_i_squared, baseband_q_squared;
 	reg		[2*BB_BITS:0]	am_detect;
-	wire	[2:0]			past_high_symbol_phase;
 	reg				symbol_ce;
 	reg	signed [BB_BITS-1:0]	symbol_i, symbol_q;
 	wire				amfil_sample;
@@ -117,7 +118,7 @@ module	qpskrcvr #(
 	wire	[BB_BITS*2:0]	cyclic_result;
 	reg				symbol_pipe, too_much_carrier;
 	wire				rmc_busy, rmc_done;
-	reg	[15:0]			carrier_phase, carrier_step,
+	reg	[17:0]			carrier_phase, carrier_step,
 					carrier_perr, carrier_ferr;
 	reg	signed	[SOFT_BITS-1:0]		cons_i, cons_q;
 	wire	[6:0]	audio_sample;
@@ -150,23 +151,8 @@ module	qpskrcvr #(
 	// TODO list.
 	//
 
-	always @(*)
-		high_symbol_phase = 3'h0;
-
-	initial	load_pll     = 0;
-	initial	pll_lgcoeff  = 5'h5;
-	initial	new_pll_step = { 3'h1, {(PHASE_BITS-3){1'b0}} };
 	always @(posedge i_clk)
 	if (i_wb_stb && i_wb_we && i_wb_addr == 2'b00)
-	begin
-		load_pll  <= |i_wb_sel[1:0];
-		pll_lgcoeff  <= i_wb_data[20:16];
-		new_pll_step <= i_wb_data[15: 0];
-	end else
-		load_pll <= 1'b0;
-
-	always @(posedge i_clk)
-	if (i_wb_stb && i_wb_we && i_wb_addr == 2'b01)
 	begin
 		reset_downsampler <= i_wb_sel[3] && i_wb_data[31];
 		write_downsampler <= |i_wb_sel[1:0];
@@ -179,6 +165,29 @@ module	qpskrcvr #(
 		reset_downsampler <= 0;
 		write_downsampler <= 0;
 	end
+
+	initial	load_pll     = 0;
+	initial	pll_lgcoeff  = 5'h5;
+	initial	new_pll_step = { 3'h1, {(PHASE_BITS-3){1'b0}} };
+	initial	high_symbol_phase = 3'h0;
+	always @(posedge i_clk)
+	if (i_wb_stb && i_wb_we && i_wb_addr == 2'b01)
+	begin
+		load_pll  <= |i_wb_sel[1:0];
+		pll_lgcoeff  <= i_wb_data[20:16];
+		new_pll_step <= i_wb_data[15: 0];
+		high_symbol_phase <= i_wb_data[26:24];
+	end else
+		load_pll <= 1'b0;
+
+	initial	track_frequency = 1'b1;
+	always @(posedge i_clk)
+	if (i_wb_stb && i_wb_we && i_wb_addr == 2'b10)
+	begin
+		track_frequency <= i_wb_data[24];
+		// carrier_step <= i_wb_data[17:0];
+	end
+
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -312,7 +321,8 @@ module	qpskrcvr #(
 	if (baseband_ce)
 		last_sym_phase <= short_phase;
 
-	assign	past_high_symbol_phase = high_symbol_phase+1;
+	always @(posedge i_clk)
+		past_high_symbol_phase <= high_symbol_phase+1;
 
 	always @(posedge i_clk)
 	if (baseband_ce)
@@ -361,7 +371,7 @@ module	qpskrcvr #(
 	remove_carrier(i_clk, i_reset,
 			symbol_ce, { symbol_i[BB_BITS-1], symbol_i },
 				{ symbol_q[BB_BITS-1], symbol_q },
-			carrier_phase,
+			carrier_phase[17:2],
 			rmc_busy, rmc_done, cons_i, cons_q);
 
 
@@ -400,7 +410,7 @@ module	qpskrcvr #(
 	// control
 	//
 	always @(*)
-		carrier_perr = 16'h0100;
+		carrier_perr = 18'h0100;
 
 	//
 	// The frequency adjustment control
@@ -411,27 +421,33 @@ module	qpskrcvr #(
 	// formula = perr ^2 / 4	(in radians)
 	//     = ( (2*pi*carrier_perr/2^16)^2 / 4 ) * (2^16 / 2/pi) = 1.5
 	always @(*)
-		carrier_ferr = 16'h01;
+		carrier_ferr = 18'h01;
 
 	initial begin
 		// Apply some initial stress to the loop--just to prove
 		// we can handle it and recover
 		carrier_phase = 0;
-		carrier_step  = 15;
+		carrier_step  = 60;
 	end
 	always @(posedge i_clk)
-	if (symbol_pipe)
 	begin
-		if (too_much_carrier)
+		if (symbol_pipe)
 		begin
-			carrier_phase <= carrier_phase - carrier_perr
-					- carrier_step;
-			carrier_step <= carrier_step + carrier_ferr;
-		end else begin
-			carrier_phase <= carrier_phase + carrier_perr
-					- carrier_step;
-			carrier_step <= carrier_step - carrier_ferr;
+			if (too_much_carrier)
+			begin
+				carrier_phase <= carrier_phase - carrier_perr
+						- carrier_step;
+				if (track_frequency)
+					carrier_step <= carrier_step + carrier_ferr;
+			end else begin
+				carrier_phase <= carrier_phase + carrier_perr
+						- carrier_step;
+				if (track_frequency)
+					carrier_step <= carrier_step - carrier_ferr;
+			end
 		end
+		if (i_wb_stb && i_wb_we && i_wb_addr == 2'b10)
+			carrier_step <= i_wb_data[17:0];
 	end
 
 	// }}}

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	hexbus.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This is the C++ program on the command side that will interact
@@ -16,9 +16,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -33,14 +33,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -71,7 +71,7 @@
 
 //
 // Three mutually exclusive possibilities are here for tracing what's going on:
-//
+// {{{
 // 1. You can define DBGPRINTF to be printf
 //	The trace file will be sent to stdout
 //
@@ -90,6 +90,7 @@
 #else
 #warning "HEXBUS DEBUG IS TURNED ON"
 #endif
+// }}}
 
 void	null(...) {}
 
@@ -97,6 +98,7 @@ bool	gbl_last_readidle = true;
 
 #include <stdarg.h> // replaces the (defunct) varargs.h include file
 void	filedump(const char *fmt, ...) {
+	// {{{
 	static	FILE *dbgfp = NULL;
 	va_list	args;
 
@@ -118,11 +120,11 @@ void	filedump(const char *fmt, ...) {
 	// va_start(args, fmt);
 	// vfprintf(stderr, fmt, args);
 	// va_end(args);
-}
+} // }}}
 
 /*
  * lclreadcode
- *
+ * {{{
  * Read from our interface, and drop any idle characters (bottom seven bits
  * set) from any interaction.
  */
@@ -141,11 +143,11 @@ int	HEXBUS::lclreadcode(char *buf, int len) {
 			*sp++ = *dp++;
 		}
 	} return ret;
-}
+} // }}}
 
 /*
  * bufalloc
- *
+ * {{{
  * Allocate4 a buffer of at least length (len).  This is similar to realloc().
  *
  */
@@ -156,11 +158,11 @@ void	HEXBUS::bufalloc(int len) {
 		delete[] m_buf;
 	m_buflen = (len&(-0x3f))+0x40;
 	m_buf = new char[m_buflen];
-}
+} // }}}
 
 /*
  * writeio
- *
+ * {{{
  * Write a single value to the debugging interface
  */
 void	HEXBUS::writeio(const BUSW a, const BUSW v) {
@@ -169,11 +171,11 @@ void	HEXBUS::writeio(const BUSW a, const BUSW v) {
 	// writev call.
 	writev(a, 0, 1, &v);
 	m_lastaddr = a; m_addr_set = true;
-}
+} // }}}
 
 /*
  * writev
- *
+ * {{{
  * This internal write function.  This writes a buffer of information to our
  * interface, and the place to study how a write works.
  *
@@ -228,30 +230,30 @@ void	HEXBUS::writev(const BUSW a, const int p, const int len,
 	if (p)
 		m_lastaddr += (len<<2);
 	DBGPRINTF("WR: LAST ADDRESS LEFT AT %08x\n", m_lastaddr);
-}
+} // }}}
 
 /*
  * writez
- *
+ * {{{
  * Write a buffer of values to a single address.
  */
 void	HEXBUS::writez(const BUSW a, const int len, const BUSW *buf) {
 	writev(a, 0, len, buf);
-}
+} // }}}
 
 /*
  * writei
- *
+ * {{{
  * Write a buffer of values to a memory range.  Unlike writez, this function
  * increments the address pointer after every memory write.
  */
 void	HEXBUS::writei(const BUSW a, const int len, const BUSW *buf) {
 	writev(a, 1, len, buf);
-}
+} // }}}
 
 /*
  * readio
- *
+ * {{{
  * Read a single value from the bus.
  *
  * If the bus returns an error, this routine will print a comment and throw
@@ -283,11 +285,11 @@ HEXBUS::BUSW	HEXBUS::readio(const HEXBUS::BUSW a) {
 	}
 
 	return v;
-}
+} // }}}
 
 /*
  * encode_address
- *
+ * {{{
  * Creates a message to be sent across the bus with a new address value
  * in it.  If the low order bit of the address is set, then the address
  * will not increment as operations are applied.
@@ -330,12 +332,12 @@ char	*HEXBUS::encode_address(const HEXBUS::BUSW a) {
 	DBGPRINTF("ADDR-CMD: \'%s\' (a was %08x)\n", m_buf, a);
 
 	return ptr;
-}
+} // }}}
 
 
 /*
  * readv
- *
+ * {{{
  * This is the main worker routine for read calls.  readio, readz, readi, all
  * end up here.  readv() reads a buffer of data from the given address, and
  * optionally increments (or not) the address after every read.
@@ -400,11 +402,11 @@ void	HEXBUS::readv(const HEXBUS::BUSW a, const int inc, const int len, HEXBUS::B
 
 	DBGPRINTF("READV::COMPLETE, [%08x] -> %08x%s\n", a, buf[0],
 		(len>1)?", ...":"");
-}
+} // }}}
 
 /*
  * readi
- *
+ * {{{
  * Read a series of values from bus addresses starting at address a,
  * incrementing the address to read from subsequent addresses along the way.
  *
@@ -412,11 +414,11 @@ void	HEXBUS::readv(const HEXBUS::BUSW a, const int inc, const int len, HEXBUS::B
  */
 void	HEXBUS::readi(const HEXBUS::BUSW a, const int len, HEXBUS::BUSW *buf) {
 	readv(a, 1, len, buf);
-}
+} // }}}
 
 /*
  * readi
- *
+ * {{{
  * Read a series of values from the bus, with all the values coming from the
  * same address: a.  The address is not incremented between individual word
  * reads.
@@ -425,11 +427,11 @@ void	HEXBUS::readi(const HEXBUS::BUSW a, const int len, HEXBUS::BUSW *buf) {
  */
 void	HEXBUS::readz(const HEXBUS::BUSW a, const int len, HEXBUS::BUSW *buf) {
 	readv(a, 0, len, buf);
-}
+} // }}}
 
 /*
  * readword()
- *
+ * {{{
  * Once the read command has been issued, readword() is called to read each
  * word's response from the bus.  This also processes any out of bounds
  * characters, such as interrupt notifications or bus error condition
@@ -523,11 +525,11 @@ HEXBUS::BUSW	HEXBUS::readword(void) {
 	} while(!done);
 
 	return result;
-}
+} // }}}
 
 /*
  * readidle()
- *
+ * {{{
  * Reads until the bus becomes idle.  This is called by writev to make sure
  * any write acknowledgements are sufficiently flushed from the stream.  In
  * case anything else is in the stream ... we mostly ignore that here too.
@@ -608,11 +610,11 @@ void	HEXBUS::readidle(void) {
 			word = 0;
 		}
 	}
-}
+} // }}}
 
 /*
  * usleep()
- *
+ * {{{
  * Called to implement some form of time-limited wait on a response from the
  * bus.
  */
@@ -645,11 +647,11 @@ void	HEXBUS::usleep(unsigned ms) {
 			// else if (m_buf[nr] == '\n')
 		}
 	}
-}
+} // }}}
 
 /*
  * wait()
- *
+ * // {{{
  * Wait for an interrupt condition.
  */
 void	HEXBUS::wait(void) {
@@ -659,7 +661,7 @@ void	HEXBUS::wait(void) {
 		// Here's where the real work is getting done
 		usleep(200);
 	} while(!m_interrupt_flag);
-}
+} // }}}
 
 // HEXBUS:  3503421 ~= 3.3 MB, stopwatch = 1:18.5 seconds, vs 53.8 secs
 //	If you issue two 512 word reads at once, time drops to 41.6 secs.

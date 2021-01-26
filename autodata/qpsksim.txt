@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename: 	qpsksim.txt
-##
+## {{{
 ## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 ##
 ## Purpose:	
@@ -10,9 +10,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2020-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,14 @@
 ## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	GPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/gpl.html
-##
 ##
 ################################################################################
 ##
-##
+## }}}
 @PREFIX=amsim
 @INCLUDEFILE=wavsim.txt
 @XMITTER=qpskxmit
@@ -44,9 +44,9 @@
 @REGS.1=0 R_TXPSHAPE  TXPSHAPE
 @REGS.2=1 R_TX2		TX2
 @REGS.3=2 R_TX3		TX3
-@REGS.4=4 R_RXPLL	RXPLL
-@REGS.5=5 R_RXFIL	RXFIL
-@REGS.6=6 R_RX2		RX2
+@REGS.5=4 R_RXFIL	RXFIL
+@REGS.4=5 R_RXSYM	RXSYM
+@REGS.6=6 R_RXCARRIER	RXCARRIER
 @REGS.7=7 R_RX3		RX3
 @RTL.MAKE.GROUP=QPSKSIM
 @RTL.MAKE.FILES=qpskxmit.v smpladc.v cicfil.v qpskrcvr.v cicfil.v

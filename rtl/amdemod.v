@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	amdemod.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,28 +27,28 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
+// }}}
 module	amdemod #(
 		parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
-		parameter [31:0]	RAW_DATA_RATE_HZ = 960_000,
+		// parameter [31:0]	RAW_DATA_RATE_HZ = 960_000,
 		parameter [31:0]	AUDIO_SAMPLE_RATE_HZ = 48_000,
 		parameter		NUM_AUDIO_COEFFS = 666,
 		parameter		HIST_BITS = 10,
 		//
 		//
 		// Verilator lint_off REALCVT
-		localparam real 	MIC_STEP_R = (4.0 * (1<<30)) * RAW_DATA_RATE_HZ
-						* 1.0 / CLOCK_FREQUENCY_HZ,
-		localparam [31:0]	MIC_STEP = MIC_STEP_R,
+		// localparam real 	MIC_STEP_R = (4.0 * (1<<30)) * RAW_DATA_RATE_HZ
+		//				* 1.0 / CLOCK_FREQUENCY_HZ,
+		// localparam [31:0]	MIC_STEP = MIC_STEP_R,
 		// Verilator lint_on REALCVT
 		localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO
 			= CLOCK_FREQUENCY_HZ / AUDIO_SAMPLE_RATE_HZ, // == 750

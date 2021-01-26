@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	MICNCO.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	To provide a simulated A/D input for testing
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -49,6 +49,7 @@ int MICNCO::operator()(int sck, int csn) {
 	m_step  += 1;
 	m_step &= 0x03ffff;
 	if (csn) {
+		// {{{
 		m_ticks = 3;
 		if (!sck) {
 			m_bomb = true; // assert(sck == 1);
@@ -57,9 +58,12 @@ int MICNCO::operator()(int sck, int csn) {
 		m_state = 0;
 		m_oreg  = 0;
 		ov = 0;
+		// }}}
 	} else {
+		// {{{
 		m_ticks++;
 		if ((!m_last_sck)&&(sck)) {
+			// {{{
 			if (m_ticks < 4) {
 				fprintf(stderr, "MICNCO-BOMB: Clock too short\n");
 				m_bomb = true; // assert(m_ticks > 6);
@@ -80,7 +84,9 @@ int MICNCO::operator()(int sck, int csn) {
 				m_oreg <<= 1;
 				m_oreg &= ((1<<12)-1);
 			}
+			// }}}
 		} ov = (m_oreg>>11)?1:0;
+		// }}}
 	}
 	m_last_sck = sck;
 	return ov;

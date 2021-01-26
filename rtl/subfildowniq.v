@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	subfildowniq.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This module implements a fairly generic 1/M downsampler.  It is
@@ -27,6 +27,7 @@
 //	between every desired output sample.
 //
 // Usage:
+// {{{
 //	Reset
 //		Reset can be used to hold the various ce flags low, and to
 //		reset the coefficient address.  Reset is not used in the data
@@ -46,8 +47,10 @@
 //		While writing coefficients in, output data will be unreliable.
 //		You can either hold i_ce low while writing coefficients into
 //		the core, or ignore the data output during this time.
+// }}}
 //
 //	Data processing:
+// {{{
 //		Every time i_ce is raised, the input value, i_sample, will be
 //		accepted in to this core as the next x[n] or data sample.  It's
 //		important that i_ce is not raised too often.  This
@@ -60,15 +63,16 @@
 //		When the output is valid, the o_ce flag will be set high and
 //		o_result will contain the result of the filter.  The output will
 //		remain valid (and constant) until the next o_ce and output.
+// }}}
 //
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -83,17 +87,16 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
-//
+// }}}
 module	subfildowniq #(
 		// {{{
 		//

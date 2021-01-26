@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	gfx_tb.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	This file is identical to automaster_tb, and a replacement
@@ -16,9 +16,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -33,14 +33,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
@@ -98,7 +98,10 @@ void	usage(void) {
 }
 
 class	TBTASK : public IDLER {
+// {{{
 public:
+	// Public declarations
+	// {{{
 	char	*m_name;
 	MAINTB	*m_tb;
 	
@@ -113,16 +116,21 @@ public:
 	COMPLEX		*m_rxbbsyms;
 	COMPLEX		*m_rxconsyms, *m_rxsyms;
 	double		*m_corlre, *m_corlim;
+	// }}}
 
 	TBTASK(void) {
+		// {{{
 		m_tb = new MAINTB;
 
 		m_rxconplot = new SIGWIN<CONPLOT>(m_rxcon = new CONPLOT(1024));
 		m_spectra   = new SIGWIN<PLOTWIN>(new PLOTWIN(RXBITS+1));
-		m_corl      = new SIGWIN<PLOTWIN>(new PLOTWIN(RXBITS+1));
+		if (false)
+			m_corl      = new SIGWIN<PLOTWIN>(new PLOTWIN(RXBITS+1));
+		else
+			m_corl = NULL;
 
 		m_txbb_specan = new CXSPECAN(m_spectra->m_plot, RXBITS+1, NULL);
-		m_txbb_specan->sample_rate(1./17./4./8. * 2.);
+		m_txbb_specan->sample_rate(1./17./8.);
 		m_txbb_specan->dB(true);
 		m_raw_specan = new CXSPECAN(m_spectra->m_plot, RXBITS+1, NULL);
 		m_raw_specan->sample_rate(1.);
@@ -140,9 +148,11 @@ public:
 		m_spectra->m_plot->set_color(RXBB,  1.00, 0.00, 0.00);
 		m_spectra->title("Frequency Analysis");
 		m_rxconplot->title("RX Constellation");
-		m_corl->m_plot->set_color(0, 1.00, 0.00, 0.00);
-		m_corl->m_plot->set_color(0, 0.00, 1.00, 0.00);
-		m_corl->title("Correlations");
+		if (m_corl) {
+			m_corl->m_plot->set_color(0, 1.00, 0.00, 0.00);
+			m_corl->m_plot->set_color(0, 0.00, 1.00, 0.00);
+			m_corl->title("Correlations");
+		}
 
 		m_txbbcon   = new COMPLEX[TXCONLEN];
 		m_txbbsyms  = new COMPLEX[TXBBLEN];
@@ -153,6 +163,7 @@ public:
 		m_rxconsyms = new COMPLEX[RXCONLEN];
 		m_corlre    = new double[CORLLEN];
 		m_corlim    = new double[CORLLEN];
+		// }}}
 	}
 
 	void	opentrace(const char *vcdname) {
@@ -163,6 +174,8 @@ public:
 		m_tb->reset();
 	}
 
+	// quantum() -- main idler work function, called by window system
+	// {{{
 	virtual	bool	quantum(void) {
 		int	txconpts = 0, txbbpts=0, rawpts=0,
 			rxcicpts=0, rxbbpts=0, rxsympts = 0, rxconpts = 0;
@@ -184,7 +197,7 @@ public:
 				txbbpts++;
 			}
 
-			m_rawsyms[txbbpts] = COMPLEX(
+			m_rawsyms[rawpts] = COMPLEX(
 				(m_tb->m_core->o_rf_data & 2) ? -1.0 : 1.0,
 				(m_tb->m_core->o_rf_data & 1) ? -1.0 : 1.0);
 			rawpts++;
@@ -210,7 +223,8 @@ public:
 				rxsympts++;
 			}
 
-			if (m_tb->m_core->main__DOT__qpskrcvri__DOT__symbol_ce){
+			// if (m_tb->m_core->main__DOT__qpskrcvri__DOT__symbol_ce)
+			if (m_tb->m_core->main__DOT__qpskrcvri__DOT__rmc_done){
 				m_rxconsyms[rxconpts] = COMPLEX(
 					(double)(sbits(m_tb->m_core->main__DOT__qpskrcvri__DOT__cons_i,8)),
 					(double)(sbits(m_tb->m_core->main__DOT__qpskrcvri__DOT__cons_q,8)));
@@ -234,7 +248,7 @@ public:
 		m_rxbb_specan->write( RXBB,  rxbbpts,  m_rxbbsyms);
 		m_rxcon->write(rxconpts, m_rxconsyms);
 
-		if (!m_corl->m_plot->paused())  {
+		if (m_corl && !m_corl->m_plot->paused())  {
 			COMPLEX	*cbuf;
 #ifdef	CORRELATE_RESULTS
 			COMPLEX	txc[CORLLEN];
@@ -276,8 +290,16 @@ public:
 			m_corl->m_plot->write(1, 0, 1., CORLLEN/2., m_corlim, true);
 		}
 
+		printf("TRACK: SYM %4x/%d/%d, FC %4x\n",
+			m_tb->m_core->main__DOT__qpskrcvri__DOT__symbol_pll__DOT__r_step,
+			m_tb->m_core->main__DOT__qpskrcvri__DOT__pll_lgcoeff,
+			m_tb->m_core->main__DOT__qpskrcvri__DOT__high_symbol_phase,
+			m_tb->m_core->main__DOT__qpskrcvri__DOT__carrier_step);
+			
 		return true;
 	}
+	// }}}
+// }}}
 };
 
 int	main(int argc, char **argv) {
@@ -288,6 +310,8 @@ int	main(int argc, char **argv) {
 	const	char *trace_file = NULL; // "trace.vcd";
 	bool	debug_flag = false;
 
+	// Argument processing
+	// {{{
 	for(int argn=1; argn < argc; argn++) {
 		if (argv[argn][0] == '-') for(int j=1;
 					(j<512)&&(argv[argn][j]);j++) {
@@ -309,6 +333,7 @@ int	main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}
+	// }}}
 
 	if (debug_flag) {
 		printf("Opening design with\n");

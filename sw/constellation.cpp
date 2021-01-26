@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	constellation.cpp
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -55,7 +55,7 @@ void	closeup(int v) {
 }
 
 void	usage(void) {
-	printf("USAGE: histogram\n");
+	printf("USAGE: constellation\n");
 }
 
 int main(int argc, char **argv) {
@@ -81,6 +81,7 @@ int main(int argc, char **argv) {
 	}
 
 	for(int y=0; y<0x20; y++) {
+		// {{{
 		int	cy = y - 0x10;
 
 		if (cy == 0)
@@ -112,6 +113,7 @@ int main(int argc, char **argv) {
 			printf("   ");
 
 		printf("\n");
+		// }}}
 	}
 
 	FILE	*hp;

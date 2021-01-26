@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename:	Makefile
-##
+## {{{
 ## Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 ##
 ## Purpose:	A master project makefile.  It tries to build all targets
@@ -11,9 +11,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2019-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2019-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,14 +28,14 @@
 ## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	GPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/gpl.html
-##
 ##
 ################################################################################
 ##
-##
+## }}}
 .PHONY: all
 all:	check-install archive datestamp rtl sim sw
 # all:	datestamp archive rtl sw sim bench bit
@@ -63,7 +63,7 @@ OCD := openocd
 #
 # Check that we have all the programs available to us that we need
 #
-#
+## {{{
 .PHONY: check-install
 check-install: check-perl check-autofpga check-verilator check-gpp
 
@@ -81,6 +81,7 @@ check-verilator:
 .PHONY: check-gpp
 check-gpp:
 	$(call checkif-installed,g++,-v)
+## }}}
 
 #
 #
@@ -94,10 +95,12 @@ check-gpp:
 # project was put together.
 #
 .PHONY: datestamp
+## {{{
 datestamp: check-perl
 	@bash -c 'perl mkdatev.pl > lastbuild.v'
 	$(call copyif-changed,lastbuild.v,rtl/builddate.v)
 	@grep "^.define" rtl/builddate.v
+## }}}
 
 #
 #
@@ -114,6 +117,7 @@ archive:
 # Build our main (and toplevel) Verilog files via autofpga
 #
 .PHONY: autodata
+## {{{
 autodata: datestamp check-autofpga
 	$(SUBMAKE) autodata
 	$(call copyif-changed,autodata/toplevel.v,rtl/toplevel.v)
@@ -124,6 +128,7 @@ autodata: datestamp check-autofpga
 	$(call copyif-changed,autodata/rtl.make.inc,rtl/make.inc)
 	$(call copyif-changed,autodata/testb.h,sim/testb.h)
 	$(call copyif-changed,autodata/main_tb.cpp,sim/main_tb.cpp)
+## }}}
 
 #
 #
@@ -131,25 +136,30 @@ autodata: datestamp check-autofpga
 # simulation class library that we can then use for simulation
 #
 .PHONY: rtl
+## {{{
 rtl: check-verilator
 	+@$(SUBMAKE) rtl
+## }}}
 
 .PHONY: rtl-sim
+## {{{
 rtl-sim:
 	+@$(SUBMAKE) rtl sim
 	+@$(SUBMAKE) sim
+## }}}
 
 .PHONY: bin
+## {{{
 bin:
 	@$(SUBMAKE) rtl sdr.bin
 
 #
-#
 # Build a simulation of this entire design
-#
 .PHONY: sim
+## {{{
 sim: rtl check-gpp
 	+@$(SUBMAKE) sim
+## }}}
 
 #
 #
@@ -158,14 +168,17 @@ sim: rtl check-gpp
 .PHONY: sw
 sw: check-gpp
 	+@$(SUBMAKE) sw
+## }}}
 
 
 #
 # Load the design onto the board
 #
 .PHONY: load
+## {{{
 load: rtl
 	iceprog rtl/sdr.bin
+## }}}
 
 
 #

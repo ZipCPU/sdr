@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	fmdemod.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	FM Demodulate an incoming I+Q (1-bit each) signal into the
@@ -22,9 +22,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -39,71 +39,70 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
-module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
+// }}}
+module	fmdemod #(
+		// {{{
+		// parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
+		// parameter [31:0]	RAW_DATA_RATE_HZ = 960_000,
+		// parameter [31:0]	AUDIO_SAMPLE_RATE_HZ = 48_000,
+		parameter		NUM_AUDIO_COEFFS = 666,
+		parameter		HIST_BITS = 10,
+		localparam	CIC_BITS = 7,
+		localparam	BB_BITS  = 16,
+		localparam	PWM_BITS = 16,
+		localparam	PLL_BITS = 28,
+		localparam [PLL_BITS-1:0]	DEFAULT_PLL_STEP = 0,
+		//
+		// localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO
+		//	= CLOCK_FREQUENCY_HZ / AUDIO_SAMPLE_RATE_HZ, // == 750
+		// localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO = 750,
+		localparam		CIC_DOWN = 25,	// About 200kHz B/W
+		// localparam		CIC_DOWN = 5,
+		localparam [31:0]	SECONDARY_DOWNSAMPLE_RATIO
+						= 750 / CIC_DOWN
+		// }}}
+	) (
+		// {{{
+		input	wire		i_clk, i_reset,
+		input	wire		i_audio_en, i_rf_en,
+		//
 		// Wishbone interface
-		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
-			o_wb_stall, o_wb_ack, o_wb_data,
-		//
+		// {{{
+		input	wire		i_wb_cyc, i_wb_stb, i_wb_we,
+		input	wire [1:0]	i_wb_addr,
+		input	wire [31:0]	i_wb_data,
+		input	wire	[3:0]	i_wb_sel,
+		output	reg		o_wb_stall,
+		output	reg		o_wb_ack,
+		output	reg	[31:0]	o_wb_data,
+		// }}}
 		// Receive interface
-		i_rf_data,
+		input	wire	[1:0]	i_rf_data,
 		//
-		// PWM interface
-		o_pwm_audio,
+		// Outgoing PWM interface
+		output	reg		o_pwm_audio,
 		//
 		// Debug interface
-		i_dbg_sel, o_dbg_ce, o_dbg_data, o_dbg_hist);
-	//
-	parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000;
-	parameter [31:0]	RAW_DATA_RATE_HZ = 960_000;
-	parameter [31:0]	AUDIO_SAMPLE_RATE_HZ = 48_000;
-	parameter		NUM_AUDIO_COEFFS = 666;
-	parameter		HIST_BITS = 10;
-	localparam	CIC_BITS = 7;
-	localparam	BB_BITS  = 16;
-	localparam	PWM_BITS = 16;
-	localparam	PLL_BITS = 28;
-	localparam [PLL_BITS-1:0]	DEFAULT_PLL_STEP = 0;
-	//
-	// localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO = CLOCK_FREQUENCY_HZ / AUDIO_SAMPLE_RATE_HZ; // == 750
-	localparam [31:0]	RAW_AUDIO_DOWNSAMPLE_RATIO = 750;
-	localparam		CIC_DOWN = 25;	// About 200kHz B/W
-	// localparam		CIC_DOWN = 5;
-	localparam [31:0]	SECONDARY_DOWNSAMPLE_RATIO = 750 / CIC_DOWN;
-	//
-	input	wire		i_clk, i_reset;
-	input	wire		i_audio_en, i_rf_en;
-	//
-	// Wishbone interface
-	input	wire		i_wb_cyc, i_wb_stb, i_wb_we;
-	input	wire [1:0]	i_wb_addr;
-	input	wire [31:0]	i_wb_data;
-	input	wire	[3:0]	i_wb_sel;
-	output	reg		o_wb_stall;
-	output	reg		o_wb_ack;
-	output	reg	[31:0]	o_wb_data;
-	//
-	// Receive interface
-	input	wire	[1:0]	i_rf_data;
-	//
-	// Outgoing PWM interface
-	output	reg		o_pwm_audio;
-	//
-	// Debug interface
-	input	wire	[1:0]	i_dbg_sel;
-	output	reg		o_dbg_ce;
-	output	reg	[31:0]	o_dbg_data;
-	output reg [HIST_BITS-1:0] o_dbg_hist;
-	//
+		// {{{
+		input	wire	[1:0]	i_dbg_sel,
+		output	reg		o_dbg_ce,
+		output	reg	[31:0]	o_dbg_data,
+		output reg [HIST_BITS-1:0] o_dbg_hist
+		// }}}
+		// }}}
+	);
+
+	// Signal declarations
+	// {{{
 	integer	k;
 
 	wire			cic_ce, cic_ign, baseband_ce;
@@ -123,7 +122,7 @@ module	fmdemod(i_clk, i_reset, i_audio_en, i_rf_en,
 	reg	[15:0]		write_coeff;
 	wire	[1:0]		pll_err;
 	wire			pll_locked;
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Incoming Bus processing

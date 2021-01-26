@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	fmxmit.v
-//
+// {{{
 // Project:	SDR, a basic Soft(Gate)ware Defined Radio architecture
 //
 // Purpose:	A basic FM transmitter.  It works in stages.  1) Get audio
@@ -15,9 +15,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -32,68 +32,64 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
-module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
+// }}}
+module	fmxmit #(
+		// {{{
+		parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000,
+		parameter [31:0]	MICROPHONE_SAMPLE_RATE_HZ = 1_000_000,
+		parameter		HIST_BITS = 10,
+		localparam		MIC_BITS=12,
+		parameter [0:0]		OPT_CIC_FILTER = 1'b0,
+		//
+		// Verilator lint_off REALCVT
+		localparam [31:0]	MIC_STEP = 4.0 * (1<<30)
+			* MICROPHONE_SAMPLE_RATE_HZ * 1.0 / CLOCK_FREQUENCY_HZ
+		// Verilator lint_on  REALCVT
+		// }}}
+	) (
+		// {{{
+		input	wire	i_clk, i_reset,
+		input	wire	i_audio_en, i_rf_en,
 		// Wishbone interface
-		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
-			o_wb_stall, o_wb_ack, o_wb_data,
+		// {{{
+		input	wire		i_wb_cyc, i_wb_stb, i_wb_we,
+		input	wire [1:0]	i_wb_addr,
+		input	wire [31:0]	i_wb_data,
+		input	wire	[3:0]	i_wb_sel,
+		output	reg		o_wb_stall,
+		output	reg		o_wb_ack,
+		output	reg	[31:0]	o_wb_data,
+		// }}}
 		//
 		// Microphone (SPI) interface
-		o_mic_csn, o_mic_sck, i_mic_miso,
-		//
+		// {{{
+		output	wire		o_mic_csn, o_mic_sck,
+		input	wire		i_mic_miso,
+		// }}}
 		// Transmit interface
-		o_rf_data,
+		output	reg	[1:0]	o_rf_data,
+		//
 		// Debug interface
-		i_dbg_sel, o_dbg_ce, o_dbg_data, o_dbg_hist);
-	//
-	parameter [31:0]	CLOCK_FREQUENCY_HZ = 36_000_000;
-	parameter [31:0]	MICROPHONE_SAMPLE_RATE_HZ = 1_000_000;
-	parameter		HIST_BITS = 10;
-	localparam		MIC_BITS=12;
-	parameter [0:0]		OPT_CIC_FILTER = 1'b0;
-	//
-	// Verilator lint_off REALCVT
-	localparam [31:0]	MIC_STEP = 4.0 * (1<<30)
-			* MICROPHONE_SAMPLE_RATE_HZ * 1.0 / CLOCK_FREQUENCY_HZ;
-	// Verilator lint_on  REALCVT
-	//
-	//
-	input	wire	i_clk, i_reset;
-	input	wire	i_audio_en, i_rf_en;
-	//
-	// Wishbone interface
-	input	wire		i_wb_cyc, i_wb_stb, i_wb_we;
-	input	wire [1:0]	i_wb_addr;
-	input	wire [31:0]	i_wb_data;
-	input	wire	[3:0]	i_wb_sel;
-	output	reg		o_wb_stall;
-	output	reg		o_wb_ack;
-	output	reg	[31:0]	o_wb_data;
-	//
-	//
-	output	wire		o_mic_csn, o_mic_sck;
-	input	wire		i_mic_miso;
-	//
-	// Transmit interface
-	output	reg	[1:0]	o_rf_data;
-	//
-	// Debug interface
-	input	wire	[1:0]	i_dbg_sel;
-	output	reg		o_dbg_ce;
-	output	reg	[31:0]	o_dbg_data;
-	output	reg	[HIST_BITS-1:0]	o_dbg_hist;
-	//
+		// {{{
+		input	wire	[1:0]	i_dbg_sel,
+		output	reg		o_dbg_ce,
+		output	reg	[31:0]	o_dbg_data,
+		output	reg	[HIST_BITS-1:0]	o_dbg_hist
+		// }}}
+		// }}}
+	);
 
-
+	// Local parameters
+	// {{{
 	localparam	CIC_BITS = 16;
 	localparam	CIC_STAGES = 4;
 	localparam	CIC_LGMEM  = 28;
@@ -105,8 +101,10 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	localparam	SIN_BITS = 12; // Change only w/ changing cordic
 	localparam	SIN_PHASE_BITS = 8; // Change only w/ changing cordic
 	localparam	PWM_BITS = 12;
+	// }}}
 
-
+	// Signal declarations
+	// {{{
 	reg				mic_ce;
 	reg	[31:0]			mic_ce_counter;
 	wire				mic_ignore, mic_valid;
@@ -125,7 +123,7 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	wire	[SIN_BITS-1:0]		cos_value, sin_value;
 	wire				cos_ignored, sin_ignored;
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Bus interface
@@ -251,12 +249,11 @@ module	fmxmit(i_clk, i_reset, i_audio_en, i_rf_en,
 	// Map our new phase value(s) to sine and cosine values
 	// Both because we are working in quadrature
 	sintable
-	costbl(i_clk, 1'b0, 1'b1,1'b0, i_counter, cos_value, cos_ignored);
+	costbl(i_clk, 1'b0, 1'b1, i_counter, cos_value, 1'b0, cos_ignored);
 
 	sintable
-	sintbl(i_clk, 1'b0, 1'b1,1'b0, q_counter, sin_value, sin_ignored);
+	sintbl(i_clk, 1'b0, 1'b1, q_counter, sin_value, 1'b0, sin_ignored);
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Sigma delta output generation
