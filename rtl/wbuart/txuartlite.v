@@ -25,7 +25,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -41,13 +41,12 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
-//
 //
 `default_nettype	none
 // }}}
@@ -89,11 +88,12 @@ module txuartlite #(
 			//	TXUL_BIT_SEVEN = 4'h7,
 				TXUL_STOP      = 4'h8,
 				TXUL_IDLE      = 4'hf;
-
+	wire		i_reset;
 	reg	[(TB-1):0]	baud_counter;
 	reg	[3:0]	state;
 	reg	[7:0]	lcl_data;
 	reg		r_busy, zero_baud_counter;
+	assign		i_reset = 1'b0;
 	// }}}
 
 	// Big state machine controlling: r_busy, state
@@ -102,27 +102,29 @@ module txuartlite #(
 	initial	r_busy = 1'b1;
 	initial	state  = TXUL_IDLE;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
-		if (!zero_baud_counter)
-			// r_busy needs to be set coming into here
+		r_busy <= 1'b1;
+		state  <= TXUL_IDLE;
+	end else if (!zero_baud_counter)
+		// r_busy needs to be set coming into here
+		r_busy <= 1'b1;
+	else if (state > TXUL_STOP)	// STATE_IDLE
+	begin
+		state <= TXUL_IDLE;
+		r_busy <= 1'b0;
+		if ((i_wr)&&(!r_busy))
+		begin	// Immediately start us off with a start bit
 			r_busy <= 1'b1;
-		else if (state > TXUL_STOP)	// STATE_IDLE
-		begin
-			state <= TXUL_IDLE;
-			r_busy <= 1'b0;
-			if ((i_wr)&&(!r_busy))
-			begin	// Immediately start us off with a start bit
-				r_busy <= 1'b1;
-				state <= TXUL_BIT_ZERO;
-			end
-		end else begin
-			// One clock tick in each of these states ...
-			r_busy <= 1'b1;
-			if (state <=TXUL_STOP) // start bit, 8-d bits, stop-b
-				state <= state + 1'b1;
-			else
-				state <= TXUL_IDLE;
+			state <= TXUL_BIT_ZERO;
 		end
+	end else begin
+		// One clock tick in each of these states ...
+		r_busy <= 1'b1;
+		if (state <=TXUL_STOP) // start bit, 8-d bits, stop-b
+			state <= state + 1'b1;
+		else
+			state <= TXUL_IDLE;
 	end
 	// }}}
 
@@ -148,10 +150,12 @@ module txuartlite #(
 	// we simple logically shift the register right to grab the next bit.
 	initial	lcl_data = 8'hff;
 	always @(posedge i_clk)
-		if ((i_wr)&&(!r_busy))
-			lcl_data <= i_data;
-		else if (zero_baud_counter)
-			lcl_data <= { 1'b1, lcl_data[7:1] };
+	if (i_reset)
+		lcl_data <= 8'hff;
+	else if (i_wr && !r_busy)
+		lcl_data <= i_data;
+	else if (zero_baud_counter)
+		lcl_data <= { 1'b1, lcl_data[7:1] };
 	// }}}
 
 	// o_uart_tx
@@ -163,10 +167,12 @@ module txuartlite #(
 	//
 	initial	o_uart_tx = 1'b1;
 	always @(posedge i_clk)
-		if ((i_wr)&&(!r_busy))
-			o_uart_tx <= 1'b0;	// Set the start bit on writes
-		else if (zero_baud_counter)	// Set the data bit.
-			o_uart_tx <= lcl_data[0];
+	if (i_reset)
+		o_uart_tx <= 1'b1;
+	else if (i_wr && !r_busy)
+		o_uart_tx <= 1'b0;	// Set the start bit on writes
+	else if (zero_baud_counter)	// Set the data bit.
+		o_uart_tx <= lcl_data[0];
 	// }}}
 
 	// Baud counter
@@ -214,8 +220,13 @@ module txuartlite #(
 	initial	zero_baud_counter = 1'b1;
 	initial	baud_counter = 0;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
+		zero_baud_counter <= 1'b1;
+		baud_counter <= 0;
+	end else begin
 		zero_baud_counter <= (baud_counter == 1);
+
 		if (state == TXUL_IDLE)
 		begin
 			baud_counter <= 0;
@@ -286,11 +297,13 @@ module txuartlite #(
 		assert(zero_baud_counter == (baud_counter == 0));
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(baud_counter != 0))&&($past(state != TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset) && $past(baud_counter != 0)
+			&& $past(state != TXUL_IDLE))
 		assert(baud_counter == $past(baud_counter - 1'b1));
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(!$past(zero_baud_counter))&&($past(state != TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset) && !$past(zero_baud_counter)
+			&& $past(state != TXUL_IDLE))
 		assert($stable(o_uart_tx));
 
 	initial	f_baud_count = 1'b0;
@@ -315,8 +328,8 @@ module txuartlite #(
 		f_txbits <= { o_uart_tx, f_txbits[9:1] };
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(!$past(zero_baud_counter))
-			&&(!$past(state==TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset)&& !$past(zero_baud_counter)
+			&& !$past(state==TXUL_IDLE))
 		assert(state == $past(state));
 
 	initial	f_bitcount = 0;
@@ -458,4 +471,3 @@ module txuartlite #(
 `endif // Verific SVA
 // }}}
 endmodule
-

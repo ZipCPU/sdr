@@ -69,7 +69,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -180,10 +180,15 @@ module	pulseshaperiq
 	//
 	// Generate the decimator via: genfil 1024 decimator 23 0.45
 	//
-	generate if (FIXED_COEFFS)
+	generate if (FIXED_COEFFS || INITIAL_COEFFS != 0)
 	begin : LOAD_INITIAL_COEFFS
 		// {{{
 		initial $readmemh(INITIAL_COEFFS, cmem);
+		// }}}
+	end
+
+	if (FIXED_COEFFS)
+	begin : NO_COEFFICIENT_UPDATE_LOGIC
 
 		// Make Verilator's -Wall happy
 		// verilator lint_off UNUSED
@@ -191,7 +196,7 @@ module	pulseshaperiq
 		assign	ignored_inputs = &{ 1'b0, i_wr_coeff, i_coeff };
 		// verilator lint_on  UNUSED
 		// }}}
-	end else begin : LOAD_COEFFICIENTS
+	end else begin : UPDATE_COEFFICIENTS
 		// {{{
 		// Coeff memory write index
 		reg	[LGNCOEFFS-1:0]	wr_coeff_index;
@@ -202,9 +207,6 @@ module	pulseshaperiq
 			wr_coeff_index <= 0;
 		else if (i_wr_coeff)
 			wr_coeff_index <= wr_coeff_index+1'b1;
-
-		if (INITIAL_COEFFS != 0)
-			initial $readmemh(INITIAL_COEFFS, cmem);
 
 		always @(posedge i_clk)
 		if (i_wr_coeff)

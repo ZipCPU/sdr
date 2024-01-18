@@ -71,7 +71,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -213,9 +213,6 @@ module	subfildowniq #(
 		else if (i_wr_coeff)
 			wr_coeff_index <= wr_coeff_index+1'b1;
 
-		if (INITIAL_COEFFS != 0)
-			initial $readmemh(INITIAL_COEFFS, cmem);
-
 		always @(posedge i_clk)
 		if (i_wr_coeff)
 			cmem[wr_coeff_index] <= i_coeff;
@@ -259,7 +256,7 @@ module	subfildowniq #(
 	end
 
 	// }}}
-	///////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Memory read index logic
 	// {{{

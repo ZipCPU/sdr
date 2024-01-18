@@ -15,7 +15,7 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2019-2021, Gisselquist Technology, LLC
+## Copyright (C) 2019-2024, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as published
@@ -68,7 +68,7 @@ INCS	:= -I. -I../sw -I$(RTLD) $(VINC)
 SOURCES := automaster_tb.cpp main_tb.cpp uartsim.cpp micnco.cpp
 HEADERS := ../sw/port.h testb.h uartsim.h micnco.h
 VOBJDR	:= $(RTLD)/obj_dir
-VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
+VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o $(OBJDIR)/verilated_threads.o
 VMAIN	:= $(VOBJDR)/Vmain__ALL.a
 SIMSRCS := uartsim.cpp micnco.cpp twoc.cpp
 SIMOBJ := $(subst .cpp,.o,$(SIMSRCS))
@@ -106,10 +106,10 @@ $(OBJDIR)/gfx_tb.o: gfx_tb.cpp
 
 
 main_tb: $(OBJDIR)/main_tb.o $(SIMOBJS) $(VMAIN) $(VOBJS)
-	$(CXX) $(FLAGS) $(INCS) $^ -lelf -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -lelf -lpthread -o $@
 
 gfx_tb: $(OBJDIR)/gfx_tb.o $(SIMOBJS) $(VMAIN) $(VOBJS)
-	$(CXX) $(FLAGS) $(GFXFLAGS) $(INCS) $^ $(GFXLIBS) -lelf -o $@
+	$(CXX) $(FLAGS) $(GFXFLAGS) $(INCS) $^ $(GFXLIBS) -lelf -lpthread -o $@
 
 #
 # The "clean" target, removing any and all remaining build products

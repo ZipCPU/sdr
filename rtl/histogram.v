@@ -47,7 +47,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -136,9 +136,12 @@ module	histogram #(
 	);
 
 	// Protocol normalization
+	// {{{
 	wire			clk, reset, bus_write, read_stall;
 	wire	[AW-1:0]	bus_read_addr;
 	reg				pre_ack;
+	// }}}
+
 `ifdef	AXILITE
 	// {{{
 	// Verilator lint_off UNUSED
@@ -164,21 +167,25 @@ module	histogram #(
 	skidbuffer #(
 		.OPT_OUTREG(1'b0), .DW(AW+ADDRLSB+3)
 	) awskd (
+		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
 		.i_valid(S_AXI_AWVALID), .o_ready(S_AXI_AWREADY),
 			.i_data({ S_AXI_AWADDR, S_AXI_AWPROT }),
 		.o_valid(skd_awvalid), .i_ready(axil_write_ready),
 			.o_data({ skd_awaddr, skd_awprot })
+		// }}}
 	);
 
 	skidbuffer #(
 		.OPT_OUTREG(1'b0), .DW(DW + (DW/8))
 	) wskd (
+		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
 		.i_valid(S_AXI_WVALID), .o_ready(S_AXI_WREADY),
 			.i_data({ S_AXI_WDATA, S_AXI_WSTRB }),
 		.o_valid(skd_wvalid), .i_ready(axil_write_ready),
 			.o_data({ skd_wdata, skd_wstrb })
+		// }}}
 	);
 
 	assign	axil_write_ready = skd_awvalid && skd_wvalid
@@ -511,6 +518,7 @@ module	histogram #(
 	//
 `ifdef	AXILITE
 `else
+	// {{{
 	wire	[F_LGDEPTH-1:0]	fwb_nreqs, fwb_nacks, fwb_outstanding;
 
 	fwb_slave #(.AW(AW), .DW(32), .F_MAX_STALL(0), .F_MAX_ACK_DELAY(3),
@@ -524,12 +532,13 @@ module	histogram #(
 	if (i_wb_cyc)
 		assert(fwb_outstanding == (o_wb_ack ? 1:0)
 				+ (pre_ack ? 1:0));
+	// }}}
 `endif
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Contract proofs
-	//
+	// {{{
 	// Pick a particular value to average and consider.  Now we'll prove
 	// that this special data, f_mem_data, will always be less then NAVGS,
 	// and in particular always less than the counter's value of how
@@ -539,9 +548,8 @@ module	histogram #(
 	//
 	//
 
-	//
-	// Count the number of times our incoming value is received
-	//
+	// f_this_counts: Count the times our incoming value is received
+	// {{{
 	initial	f_this_counts = 0;
 	always @(posedge clk)
 	if (start_reset || resetpipe)
@@ -554,6 +562,7 @@ module	histogram #(
 		// In all other cases, if we see our special value,
 		// accumulate  it
 		f_this_counts <= f_this_counts + 1;
+	// }}}
 
 	//
 	// For tracking bypass issues, keep track of when our special
@@ -579,8 +588,9 @@ module	histogram #(
 
 	always @(*)
 	if (resetpipe && activemem == f_addr[AW])
+	begin
 		assert(first_reset_clock || f_this_counts == 0);
-	else if (f_this_pipe[3:1] == 0)
+	end else if (f_this_pipe[2:1] == 0)
 		assert(f_this_counts == f_mem_data);
 
 	//
@@ -608,7 +618,7 @@ module	histogram #(
 
 	//
 	// Prove that our special memory value matches this count
-	//
+	// {{{
 	always @(posedge clk)
 	if (f_past_valid && $past(f_past_valid) && cepipe[2]
 			&& { activemem, memaddr } == f_addr
@@ -620,6 +630,7 @@ module	histogram #(
 			&& activemem == f_addr[AW]
 			&& memaddr[AW-1:0] > f_addr[AW-1:0])
 		assert(f_mem_data == 0);
+	// }}}
 
 	//
 	// Induction check: Make certain that if f_this_pipe is ever true, then
@@ -639,7 +650,7 @@ module	histogram #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Our counter isn't allowed to generate anything over NAVGS--EVER
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -653,19 +664,23 @@ module	histogram #(
 	if (!start_reset && !resetpipe && activemem == f_addr[AW])
 		assert(f_this_counts <= count);
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Reset sequence checks
-	//
+	// {{{
 	always @(*)
 	if (resetpipe)
 		assert(count == 0);
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Interrupt / memory swap check
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
+	//
+
 	always @(posedge i_clk)
 	if (f_past_valid && $past(!reset && cepipe[0] && !start_reset && !bus_write) // && i_ce
 		&& $past(count == NAVGS-1))
